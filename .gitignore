@@ -1,0 +1,5 @@
+__pycache__/
+sim/obj*/
+bitstreams/
+ddr3/test/out/
+ddr3/test/out_*/

@@ -1,0 +1,107 @@
+ascal_poly_bram.patch -- the Tango modification of TEMLIB ascal.vhd (sys-tango, 2026-10-03; NOTICE).
+Applied by ascal_ghdl/gen.sh 8 to a copy of ascal.vhd (which stays byte-identical to MiSTer's) before GHDL makes
+ascal_fixed8.v, the FRAC 8 netlist of the TANGO_VIDEO_PROC builds (docs/VIDEO-PROCESSING.md 2.3).  It makes the three
+polyphase coefficient memories synchronous-read RAMs, so GHDL infers them ("found RAM") and Gowin maps them to
+block RAM (the GW5A has no LUT RAM: as flip-flops the 3 x 256 x 40 bits are 30720 registers):
+  - the writes: one statement per memory instead of the CASE's four (o_a_poly_mem was written in two branches);
+  - the reads: each memory into its own register, every clock, one clock ahead with the address the old read
+    would use one clock later (o_vfrac -> o_v_poly_addr, o_hfrac(2) -> o_hfrac(3), o_a_poly_addr's next value);
+    the old registers take those registers.  Same output on every clock while no coefficient is being written
+    (while one is written, the new value reaches the picture one clock later than before).
+Line numbers: ascal.vhd as in this repository (= Genesis_MiSTer adc0c42 sys/ascal.vhd).
+
+--- a/ascal.vhd
++++ b/ascal.vhd
+@@ -991,6 +991,10 @@
+ 	SIGNAL poly_wr_mode : std_logic_vector(2 DOWNTO 0);
+ 	SIGNAL poly_tdw : unsigned(39 DOWNTO 0);
+ 	SIGNAL poly_a2 : unsigned(FRAC-1 DOWNTO 0);
++	-- Tango (sys-tango, 2026-10-03): the three coefficient memories' read registers.  Each memory is read one
++	-- clock ahead, unconditionally, with the address its old read had one clock later, so the memories are
++	-- synchronous-read RAMs (block RAM where there is no LUT RAM, as on Gowin GW5A); the output is the same.
++	SIGNAL o_h_poly_dr, o_v_poly_dr, o_a_poly_dr : unsigned(39 DOWNTO 0);
+ 
+ 	FUNCTION poly_unpack(a : unsigned(39 DOWNTO 0)) RETURN poly_phase_t IS
+ 		VARIABLE v : poly_phase_t;
+@@ -2287,38 +2291,46 @@
+ 	-- Fetch polyphase coefficients
+ 	PolyFetch:PROCESS (o_clk) IS
+ 		VARIABLE hfrac3_v, vfrac_v : unsigned(FRAC-1 DOWNTO 0);
++		VARIABLE a_addr_v : integer RANGE 0 TO 2**FRAC-1; -- Tango
+ 	BEGIN
+ 		IF rising_edge(o_clk) THEN
+ 			hfrac3_v:=o_hfrac(3)(11 DOWNTO 12-FRAC);
+ 			vfrac_v:=o_vfrac(11 DOWNTO 12-FRAC);
+ 
++			-- Tango: read ahead (o_v_poly_addr and o_hfrac(3) take these addresses at this edge)
++			o_v_poly_dr<=o_v_poly_mem(to_integer(o_vfrac(11 DOWNTO 12-FRAC)));
++			o_h_poly_dr<=o_h_poly_mem(to_integer(o_hfrac(2)(11 DOWNTO 12-FRAC)));
++
+ 			o_v_poly_use_adaptive <= to_std_logic((o_vmode(2 DOWNTO 0)/="000") AND (o_v_poly_adaptive = '1'));
+ 			o_h_poly_use_adaptive <= to_std_logic((o_hmode(2 DOWNTO 0)/="000") AND (o_h_poly_adaptive = '1'));
+ 			o_v_poly_addr<=to_integer(o_vfrac(11 DOWNTO 12-FRAC));
+ 
+ 			-- C3 / HC3 / VC4
+ 			IF o_vmode(2 DOWNTO 0)/="000" THEN
+-				o_v_poly_phase_a<=poly_unpack(o_v_poly_mem(o_v_poly_addr));
++				o_v_poly_phase_a<=poly_unpack(o_v_poly_dr); -- Tango: was o_v_poly_mem(o_v_poly_addr)
+ 			ELSE
+ 				o_v_poly_phase_a<=poly_nn(vfrac_v);
+ 			END IF;
+ 
+ 			IF o_hmode(2 DOWNTO 0)/="000" THEN
+-				o_h_poly_phase_a<=poly_unpack(o_h_poly_mem(to_integer(hfrac3_v)));
++				o_h_poly_phase_a<=poly_unpack(o_h_poly_dr); -- Tango: was o_h_poly_mem(to_integer(hfrac3_v))
+ 			ELSE
+ 				o_h_poly_phase_a<=poly_nn(hfrac3_v);
+ 			END IF;
+ 
++			a_addr_v:=o_a_poly_addr; -- Tango: o_a_poly_addr's next value, read ahead below
+ 			IF o_v_poly_use_adaptive='1' THEN
+ 				o_poly_lum<=poly_lum(o_v_lum_pix);
+-				o_a_poly_addr<=o_v_poly_addr;
++				a_addr_v:=o_v_poly_addr;
+ 			ELSIF o_h_poly_use_adaptive='1' THEN
+ 				o_poly_lum<=poly_lum(o_h_lum_pix);
+-				o_a_poly_addr<=to_integer(hfrac3_v);
++				a_addr_v:=to_integer(hfrac3_v);
+ 			END IF;
++			o_a_poly_addr<=a_addr_v;
++			o_a_poly_dr<=o_a_poly_mem(a_addr_v);
+ 
+ 			-- C4 / HC4 / VC5
+-			o_poly_phase_b<=poly_unpack(o_a_poly_mem(o_a_poly_addr));
++			o_poly_phase_b<=poly_unpack(o_a_poly_dr); -- Tango: was o_a_poly_mem(o_a_poly_addr)
+ 
+ 			IF o_v_poly_use_adaptive='1' THEN
+ 				o_poly_phase_a<=o_v_poly_phase_a;
+@@ -2419,18 +2431,25 @@
+ 			poly_wr_mode(2)<=poly_wr AND poly_a(FRAC+3) AND to_std_logic(ADAPTIVE);
+ 			poly_a2<=poly_a(FRAC+1 DOWNTO 2);
+ 
++			-- Tango: one write per memory (RAM inference), the same writes as the CASE below had
++			IF poly_wr_mode="001" THEN
++				o_h_poly_mem(to_integer(poly_a2))<=poly_tdw;
++			END IF;
++			IF poly_wr_mode="010" THEN
++				o_v_poly_mem(to_integer(poly_a2))<=poly_tdw;
++			END IF;
++			IF poly_wr_mode="101" OR poly_wr_mode="110" THEN
++				o_a_poly_mem(to_integer(poly_a2))<=poly_tdw;
++			END IF;
++
+ 			CASE poly_wr_mode IS
+ 				WHEN "001" => -- horiz
+-					o_h_poly_mem(to_integer(poly_a2))<=poly_tdw;
+ 					o_h_poly_adaptive<='0';
+ 				WHEN "010" => -- vert
+-					o_v_poly_mem(to_integer(poly_a2))<=poly_tdw;
+ 					o_v_poly_adaptive<='0';
+ 				WHEN "101" => -- horiz adaptive
+-					o_a_poly_mem(to_integer(poly_a2))<=poly_tdw;
+ 					o_h_poly_adaptive<='1';
+ 				WHEN "110" => -- vert adaptive
+-					o_a_poly_mem(to_integer(poly_a2))<=poly_tdw;
+ 					o_v_poly_adaptive<='1';
+ 				WHEN OTHERS => NULL;
+ 			END CASE;

@@ -1,0 +1,45 @@
+// tango_sys_top138_dbg (the debug build of any Console 138K Tango core): = tango_console138k.cst with the
+// internal nets under the wrapper instance u/.
+// clk + HDMI (silicon-proven).
+IO_LOC "clk" V22; IO_PORT "clk" IO_TYPE=LVCMOS33 PULL_MODE=NONE;
+IO_LOC "tmds_clk_p" G15; IO_PORT "tmds_clk_p" PULL_MODE=NONE IO_TYPE=LVCMOS33D;
+IO_LOC "tmds_clk_n" G16; IO_PORT "tmds_clk_n" PULL_MODE=NONE IO_TYPE=LVCMOS33D;
+IO_LOC "tmds_d_p[0]" J14; IO_PORT "tmds_d_p[0]" PULL_MODE=NONE IO_TYPE=LVCMOS33D;
+IO_LOC "tmds_d_n[0]" H14; IO_PORT "tmds_d_n[0]" PULL_MODE=NONE IO_TYPE=LVCMOS33D;
+IO_LOC "tmds_d_p[1]" J15; IO_PORT "tmds_d_p[1]" PULL_MODE=NONE IO_TYPE=LVCMOS33D;
+IO_LOC "tmds_d_n[1]" H15; IO_PORT "tmds_d_n[1]" PULL_MODE=NONE IO_TYPE=LVCMOS33D;
+IO_LOC "tmds_d_p[2]" K17; IO_PORT "tmds_d_p[2]" PULL_MODE=NONE IO_TYPE=LVCMOS33D;
+IO_LOC "tmds_d_n[2]" J17; IO_PORT "tmds_d_n[2]" PULL_MODE=NONE IO_TYPE=LVCMOS33D;
+
+// BL616 link: pins, pulls and drives copied from the MiSTle A2600Nano Console 138K
+// constraints (MiSTle-Dev/A2600Nano src/tang/console138k/a2600_top.cst,
+// lines 6-21; our port names: spi_sclk -> spi_sck, spi_dat -> spi_mosi, spi_dir -> spi_miso).
+// T13/V12/R13/U13 are the JTAG balls TMS/TCK/TDI/TDO (GW5AST-138B PBGA484A.json CFG field):
+// the build sets -use_jtag_as_gpio 1.
+// A2600Nano's lines verbatim (a2600_top.cst 6-7); PnR places the port on an ordinary IO, which we
+// fix to T16 = where A2600's build put it (its pnr report), so the pins match the proven core.
+NET_LOC "jtagseln" V_JTAGSELN;
+IO_PORT "jtagseln" PULL_MODE=DOWN IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
+IO_LOC "jtagseln" T16;
+IO_LOC "bl616_jtagsel" V14;   // BL616 GPIO28 (former UART), FPGA input
+IO_PORT "bl616_jtagsel" PULL_MODE=UP IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
+IO_LOC "spi_csn" T13;         // TMS / BL616 GPIO0
+IO_PORT "spi_csn" PULL_MODE=UP IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
+// SCK is the link's bit clock (tango_link SCK domain) on a global clock, as A2600Nano's
+// a2600_top.cst line 1 (CLOCK_LOC "spi_io_clk" BUFG = CLK).
+CLOCK_LOC "u/spi_sck_clk" BUFG = CLK;
+IO_LOC "spi_sck" V12;         // TCK / BL616 GPIO1, 4K7 pull-down on the module
+IO_PORT "spi_sck" PULL_MODE=NONE DRIVE=OFF IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
+IO_LOC "spi_mosi" R13;        // TDI / BL616 GPIO3
+IO_PORT "spi_mosi" PULL_MODE=NONE DRIVE=OFF IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
+IO_LOC "spi_miso" U13;        // TDO / BL616 GPIO2, 3K3 pull-down on the board
+IO_PORT "spi_miso" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
+IO_LOC "spi_irqn" U15;        // BL616 GPIO27 (former UART)
+IO_PORT "spi_irqn" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
+
+// USB-A host ports (Sipeed Tang_Mega_138K_Console_32001C schematic, "2 x USB-A": FPGA_USB1_P/N = M15/M16,
+// FPGA_USB2_P/N = H13/G13, bank 3, 15k pull-downs on the board, VBUS always on).
+IO_LOC "usb1_dp" M15; IO_PORT "usb1_dp" IO_TYPE=LVCMOS33 PULL_MODE=DOWN DRIVE=8;
+IO_LOC "usb1_dn" M16; IO_PORT "usb1_dn" IO_TYPE=LVCMOS33 PULL_MODE=DOWN DRIVE=8;
+IO_LOC "usb2_dp" H13; IO_PORT "usb2_dp" IO_TYPE=LVCMOS33 PULL_MODE=DOWN DRIVE=8;
+IO_LOC "usb2_dn" G13; IO_PORT "usb2_dn" IO_TYPE=LVCMOS33 PULL_MODE=DOWN DRIVE=8;
