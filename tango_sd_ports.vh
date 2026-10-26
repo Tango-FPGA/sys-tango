@@ -3,7 +3,7 @@
 // tango_sd_ports.vh -- MiSTer's block-device ports (Template_MiSTer sys/hps_io.sv 128-143, master 3ea1134), for
 // cores built with TANGO_SD (build_core.sh TANGO_SD=1; Verilator +define+TANGO_SD).  VDNUM =
 // `TANGO_SD_VDNUM (default 1, up to 4); 512-byte blocks (BLKSZ 2); 8-bit data (WIDE 0).  Meanings: tango_sd.v
-// and menu-tango docs/spec/tango-spec.html "Block device".  CLK_SYS domain.
+// and README "The core interface".  CLK_SYS domain.
 input  wire [`TANGO_SD_VDNUM-1:0] img_mounted,     // one clock: drive d's image changed (size 0 = ejected)
 input  wire         img_readonly,
 input  wire [63:0]  img_size,

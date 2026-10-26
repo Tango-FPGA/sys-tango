@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 """check_vsync_stage2.py <run.log> [--want W1xV1,P1 W2xV2,P2 ...] -- judges a STAGE2=1 run of sim/tb_ascal_ddr3.v
 (TANGO_VSYNC_ADJUST + TB_VSYNC_CORE + TB_VSYNC_STAGE2; sim/run_tb_vsync_ddr3.sh STAGE2=1: the runtime raster totals).
 

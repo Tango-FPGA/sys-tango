@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 the Tango authors
 // tb_ds4_equiv.cpp -- see tb_ds4_equiv.v.  Reads the "ds4" table from sim/pads/pad_vectors.txt, programs the engine, then sends N random
 // DualShock 4 reports (hat 0..8, random buttons) through both decoders and compares the raw words.
 #include <cstdio>

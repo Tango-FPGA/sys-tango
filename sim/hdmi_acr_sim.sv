@@ -20,7 +20,7 @@ module audio_clock_regeneration_packet
     output logic [23:0] header,
     output logic [55:0] sub [3:0]
 `ifdef TANGO_HDMI_RETUNE
-    , input logic [19:0] acr_cts_rt   // TANG PATCH 3 (TANGO_HDMI_RETUNE): the CTS at run time (hdmi.sv modification 5)
+    , input logic [19:0] acr_cts_rt   // TANG PATCH 3 (Stage 3): the CTS at run time (hdmi.sv modification 5)
 `endif
 );
 localparam int NI = ACR_N != 0 ? ACR_N : 6144;

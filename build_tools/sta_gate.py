@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 """sta_gate.py -- pass/fail gate on a Gowin build's timing + resources.
 
 Usage: sta_gate.py [impl_dir] [--relax NAME:FREQ_MHZ ...]
@@ -93,7 +95,7 @@ if tp:
         if relax and fmax_all_pass:
             print(f"  note: worst slack measured against overconstrained SDC; Fmax passes at relaxed threshold(s)")
         else:
-            # R33: a build that closed under +0.10 ns worked in the tool and failed on silicon.
+            # R33: a build that closes under +0.10 ns worked in the tool and failed on silicon.
             MIN_SLACK = 0.10
             if w < MIN_SLACK: fails.append(f"worst setup slack {w:+.3f} ns < +{MIN_SLACK:.2f} ns (R33 flashing margin)")
 

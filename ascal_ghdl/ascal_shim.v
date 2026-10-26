@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 the Tango authors
 // ascal_shim -- `module ascal` for Verilator AND Gowin builds: the REAL TEMLIB ascal.vhd, as the
 // GHDL netlist of ascal_fixed.vhd (ascal_fixed.v, made by gen.sh), behind the parameter
 // and port names sys/ascal_wrap.v uses, so ascal_wrap.v compiles unmodified.  Gowin's VHDL front

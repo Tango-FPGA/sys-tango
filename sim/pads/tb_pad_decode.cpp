@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 the Tango authors
 // tb_pad_decode.cpp -- unit bench for tango_pad_decode.v.
 //
 // Replays sim/pads/pad_vectors.txt, which the firmware's (menu-tango's) bl616/tango/test/pd_vectors.c writes from the C reference decode (pd_eval).

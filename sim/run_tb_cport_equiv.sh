@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # run_tb_cport_equiv.sh [selfcheck|mutants] -- the lockstep equivalence bench (sim/tb_cport_equiv.v) of tango_ddr3_cport
 # against sim/cport_ref (the core port before its timing fix).
 #   (no argument)  the configurations (core clock slower / equal / faster than clk_ddr, other seeds): all must print TB_RESULT PASS

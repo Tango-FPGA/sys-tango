@@ -1,9 +1,27 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 the Tango authors
+// Copyright (c) 2020 Grabulosaure, (c) 2021 Alexey Melnikov (sys/video_freak.sv: video crop)
+// Copyright (c) 2021 Alexey Melnikov (sys/video_freak.sv: integer scaling)
+// (c)2017-2020 Alexey Melnikov (sys/sys_top.v)
+//
+// This file is derived from MiSTer's picture placement: the MiSTer project's Template_MiSTer
+// (https://github.com/MiSTer-devel/Template_MiSTer, compared at commit 5dda373), sys/video_freak.sv (modules
+// video_freak and video_scale_int: crop, aspect and the SCALE modes, in their order and with their names: vcrop,
+// voff, arxo, aryo, htarget, wres, ...) and sys/sys_top.v 856-944 (the window from the aspect or size).
+// video_freak.sv states "This program is GPL Licensed. See COPYING for the full license." without a version
+// (Template_MiSTer has no COPYING; its LICENSE file is the text of the GNU General Public License version 2);
+// sys_top.v states "either version 2 of the License, or (at your option) any later version".
+// GPLv2 section 9: "If the Program does not specify a version number of this License, you may choose any version
+// ever published by the Free Software Foundation."
+// On that basis (video_freak.sv) and sys_top.v's own "or later", this file is under the GNU General Public License
+// version 2 or (at your option) any later version (GPL-2.0-or-later; LICENSES/GPL-2.0.txt, LICENSES/GPL-3.0.txt),
+// not under the MIT licence of the rest of sys-tango; see NOTICE.  Every build with a video path (TANGO_VIDEO_FB or
+// TANGO_VIDEO_ASCAL: tango_video instantiates this module) contains it, and such a bitstream is a work under the GPL.
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 //==============================================================================
 // tango_video_geo -- the geometry of one source frame on the 720p screen, and the nearest-neighbour
-// step constants the scaler (tango_video) walks with.  Our own code, written from the BEHAVIOUR of
-// MiSTer's video path (no MiSTer code is copied):
+// step constants the scaler (tango_video) walks with, from MiSTer's video path:
 //   1. crop (video_freak.sv 58-62, 76, 116-118): vcrop = CROP_SIZE unless >= the frame's lines;
 //      voff = (vtot - vcrop)/2 + CROP_OFF, clamped to [0, vtot - vcrop];
 //   2. crop keeps the aspect (video_freak.sv 80-114): arx*vtot : ary*vcrop, normalised to 12 bits;

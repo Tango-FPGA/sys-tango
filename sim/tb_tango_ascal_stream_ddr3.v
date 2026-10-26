@@ -47,7 +47,7 @@
 `default_nettype none
 `timescale 1ns/1ps
 module tb_tango_ascal_stream_ddr3;
-`include "tango_ddr3_silicon.vh"                       // the model calibrated on silicon (the DDR3 bring-up test)
+`include "tango_ddr3_silicon.vh"                       // the model calibrated on silicon (D1)
 `ifndef Q_CORE
 `define Q_CORE 8
 `endif

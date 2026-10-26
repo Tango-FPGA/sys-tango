@@ -1,5 +1,7 @@
-// SPDX-License-Identifier: MIT
-// Copyright (c) 2026 the Tango authors
+// Gowin IP generator output: the PLL wrapper (the module with its pll_c27_MOD and PLL_INIT instances and the PLL_INIT
+// defparams) that the Gowin IDE's PLL_ADV generator writes beside pll_c27_mod.v; the generator's output carries
+// "Copyright (C)2014-2025 Gowin Semiconductor Corporation. All rights reserved."  Not under sys-tango's MIT licence;
+// see NOTICE ("Gowin IP templates").  Reformatted by the Tango authors (the lock comment).
 module pll_c27(clkin, init_clk, clkout0, lock);
 input clkin; input init_clk; output clkout0; output lock;   // lock = PLL_INIT O_LOCK (as pll_c48)
 wire [5:0] icpsel; wire [2:0] lpfres; wire pll_lock; wire pll_rst;

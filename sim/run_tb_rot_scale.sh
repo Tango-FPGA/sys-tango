@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # run_tb_rot_scale.sh -- the arcade Scale entry (Normal / V-Integer only). sim/tb_rot_scale.v runs
 # tango_video_scale_arc.vh + tango_video_rot_geo.vh (the functions tango_video includes) into the REAL tango_video_geo:
 # arcade status 2/3 -> exactly the Normal window, 0/1 the recorded Normal / V-Integer windows (Galaga rotated: Normal

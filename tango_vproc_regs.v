@@ -7,6 +7,9 @@
 // (its TANGO_LINK_TAP outputs), and drives ascal's polyphase port, the gamma tables, the shadow mask and the audio
 // filter's coefficients.  Our own code; the meanings are MiSTer's, read from Template_MiSTer 19e89ce sys_top.v
 // 339-347 / 370-397 / 468-503, hps_io.sv 527-532 and ascal.vhd 2408-2437.
+// MiSTer data in this file: the audio filter's default values (a_rate 7056000, a_cx 4258969, a_cx0-2 3 / 3 / 1, a_cy0-2
+// -6216759 / 6143386 / -2023767) are MiSTer's, from Template_MiSTer sys/sys_top.v 386-397 (GPL-2.0-or-later); the
+// command numbers are Main_MiSTer's UIO_* numbers.  NOTICE lists them.
 //
 // Wire format (README, link commands; byte n = data byte n, i.e. link byte n + 2; multi-byte fields big-endian):
 //   0x2A  n0 set (0 H, 1 V, 2 H adaptive, 3 V adaptive), n1 k (the transfer carries 2^k phases, k 0..8), then per
@@ -177,7 +180,7 @@ module tango_vproc_regs (
     reg [15:0] n = 16'd0;
     // n == 0 and n == 1, the compares the decode below uses, taken in this stage too (n_is0 = (n == 0) and n_is1 =
     // (n == 1) at every clock): they were the first LUT levels of the FLTCOEF writer's load (n -> the 40 w_taps flops),
-    // which missed clk_pix by 0.25 ns in an Atari 2600 scaler build.
+    // which missed clk_pix by 0.25 ns in an A2600 scaler build.
     reg        n_is0 = 1'b1, n_is1 = 1'b0;
     wire [15:0] n_in = p_busy ? p_n : tap_n;
     always @(posedge clk) begin

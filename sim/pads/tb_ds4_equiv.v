@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 the Tango authors
 // tb_ds4_equiv.v -- the existing hardwired DualShock 4 decode (tango_ds4_joy.v, silicon-proven) next to tango_pad_decode with the
 // built-in DS4 table, fed the same reports.  tb_ds4_equiv.cpp compares tango_ds4_joy's `rw` (the decode of the captured bytes) with the
 // engine's raw word for every report.  Purpose: the DS4 table equals the hardwired decode at RTL level, so mode 0 (hardwired) can be

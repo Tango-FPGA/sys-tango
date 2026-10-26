@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 the Tango authors
 // tango_sys_top138_dbg: = tango_console138k.sdc with the clock nets under the wrapper instance u/.
 // tango_sys_top138 (every Console 138K core): clk, clk27, clk_ser, clk_pix, clk_audio + clk48 for the USB hosts
 // (pll_c48).  Clock domains are asynchronous groups; every crossing is by construction:

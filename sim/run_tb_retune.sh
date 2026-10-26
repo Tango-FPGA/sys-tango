@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # run_tb_retune.sh [PLL=745875] -- vsync_adjust's HDMI PLL retune at core start, at the clock level (sim/tb_retune.v + sim/check_retune.py): the HDMI
 # PLL (a behavioural model of the Gowin primitive, sim/gw_pll_hdmi_sim.v, with Gowin's own PLL_INIT) switched at run time by
 # SYS 0x70 through tango_vsync and tango_pll_retune, hdmi.sv's raster / ACR / audio clock checked at both clocks.

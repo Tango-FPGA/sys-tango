@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # gen.sh -- regenerate ascal_fixed.v, the Verilog netlist of the REAL TEMLIB ascal
 # (sys/ascal.vhd, generics fixed by ascal_fixed.vhd), with GHDL's built-in synthesis,
 # then prove sys/ascal_wrap.v + ascal_shim.v + the netlist elaborate (verilator

@@ -1,11 +1,24 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 the Tango authors
+// Copyright (C) 2020 Sorgelig (sys/iir_filter.v)
+// (c)2020-2026 Alexey Melnikov (sys/audio_out.sv)
+//
+// This file is derived from MiSTer's audio filter and mix: the MiSTer project's Template_MiSTer
+// (https://github.com/MiSTer-devel/Template_MiSTer, compared at commit 5dda373), sys/iir_filter.v (modules IIR_filter,
+// iir_filter_tap, DC_blocker) and sys/audio_out.sv (module aud_mix_top): their arithmetic, stage by stage and in
+// their order, with their constants (the 48 kHz DC-blocker shifts, the boost localparams) and signal names.  Both
+// files state: "This program is free software; you can redistribute it and/or modify it under the terms of the GNU
+// General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your
+// option) any later version."  This file is under the same terms (GPL-2.0-or-later; LICENSES/GPL-2.0.txt,
+// LICENSES/GPL-3.0.txt), not under the MIT licence of the rest of sys-tango; see NOTICE.  A bitstream that contains it is a work under the GPL.
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 //==============================================================================
-// tango_audio_filter -- MiSTer's audio filter (README "Video and audio processing"), our own code: the 3-tap IIR at the
+// tango_audio_filter -- MiSTer's audio filter (README "Video and audio processing"): the 3-tap IIR at the
 // filter file's rate, the 48 kHz hand-over and the DC blocker, between the core's AUDIO_L/R and the framework's
-// 48 kHz HDMI sampling (TANGO_AUDIO_FILTER).  The arithmetic is MiSTer's, read for behaviour only from Template_MiSTer
-// 19e89ce sys/iir_filter.v 52-97 and 181-208 (IIR), 211-235 (DC_blocker) and sys/audio_out.sv 165-213 (rates,
-// mute); the file values arrive as MiSTer's sys_top keeps them (tango_vproc_regs: rate, cx, cx0-2, cy0-2).
+// 48 kHz HDMI sampling (TANGO_AUDIO_FILTER).  The arithmetic is MiSTer's (Template_MiSTer 5dda373
+// sys/iir_filter.v 52-97 and 181-208 (IIR), 211-235 (DC_blocker) and sys/audio_out.sv 165-213 (rates,
+// mute)); the file values arrive as MiSTer's sys_top keeps them (tango_vproc_regs: rate, cx, cx0-2, cy0-2).
 // Per channel and filter step, all 40-bit two's complement (wrapping as MiSTer's 40-bit nets):
 //   x   = (in * cx) >>> 20                       in: 16-bit signed sample, cx 40 bit
 //   y   = x + t0                                 out = y >>> 20, saturated to 16 bits (iir_filter.v 99)

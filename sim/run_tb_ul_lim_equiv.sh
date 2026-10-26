@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # run_tb_ul_lim_equiv.sh -- build and run sim/tb_ul_lim_equiv.v against the REAL tango_ul_lim module in
 # tango_link.v, then run the mutant set (each mutant is a python edit of a COPY of tango_link.v; the
 # repo file is never modified) and require every non-equivalent mutant to be caught (bench exit != 0).

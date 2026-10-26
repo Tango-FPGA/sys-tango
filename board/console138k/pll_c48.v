@@ -1,5 +1,7 @@
-// SPDX-License-Identifier: MIT
-// Copyright (c) 2026 the Tango authors
+// Gowin IP generator output: the PLL wrapper (the module with its pll_c48_MOD and PLL_INIT instances and the PLL_INIT
+// defparams) that the Gowin IDE's PLL_ADV generator writes beside pll_c48_mod.v; the generator's output carries
+// "Copyright (C)2014-2025 Gowin Semiconductor Corporation. All rights reserved."  Not under sys-tango's MIT licence;
+// see NOTICE ("Gowin IP templates").  Reformatted by the Tango authors.
 // Proven on the Console 138K: the two USB-A host ports run on it.
 // pll_c48 -- 50 MHz -> 48 MHz for the USB host ports, GW5AST PLL + PLL_INIT.
 // PLL_INIT is mandatory on GW5AST (without it the PLL does not lock): MULTI_FAC

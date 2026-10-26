@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 the Tango authors
 // tang_ds4_pad.sv -- map a DualShock 4 USB HID input report to the NES
 // controller shift-register protocol, drop-in for tang_fake_pad.
 //

@@ -39,9 +39,9 @@
 // A pass (every 2^SNAP_LOG2 clocks once the display has taken the last bank, and on each UART request) captures the
 // 40 register slots in one clock, then writes slot after slot: those, and the 62 committed ones from cm.  The copier
 // and the commit never run together, so a snapshot holds whole runs; no reader ever reads a bank being written.
-// After configuration a clear pass writes every RAM (GW5A block RAM has no usable initial values); the tester
-// starts once it is done.
-// Structure (timing at 100 MHz; an earlier build without it closed at 52 MHz):
+// After configuration a clear pass writes every RAM (GW5A block RAM has no usable initial values on
+// silicon); the tester starts once it is done.
+// Structure (timing at 100 MHz; the first build closed at 52 MHz):
 //   - the sequencer issues run descriptors; an expander makes one request a clock from them into a 2-entry queue
 //     with a registered ready; the queue's head goes to the IP (cmd_en = head valid && cmd_ready && (write ?
 //     wr_data_rdy : a read slot)).  Everything that measures the IP (accept counts and times, not-ready runs, read

@@ -176,9 +176,9 @@ module usb_fs_host (
     // USB CRC16 is checked by running the same CRC over the data AND the two
     // trailing CRC bytes; an intact packet leaves a constant residual.
     // ⛔ THAT CONSTANT IS 16'hB001 FOR THIS REFLECTED/A001 FORM, NOT 16'h800D.
-    // An earlier build used 800D -- the residual for the NON-reflected convention --
-    // and it rejected EVERY packet, which killed the controller outright on
-    // silicon (no button reached the core). Verified
+    // 800D -- the residual for the NON-reflected convention -- was tried
+    // first and rejected EVERY packet, which killed the controller outright on
+    // silicon (no button press reached the core). Verified
     // the right way before the rebuild: 200 random payloads of 8..64 bytes
     // all leave 0xB001, and a single bit-flip leaves 0x7CC0, so the check
     // both passes good packets and catches corruption.
@@ -352,7 +352,7 @@ module usb_fs_host (
     //  pc2: SET_CONFIGURATION(1) SETUP+DATA0 (addr1) -> ACK
     //  pc3: status IN (addr1) -> DATA1 -> we ACK
     //  pc4: forever: IN poll addr1, scanned ep -> NAK (skip) or DATAx -> ACK
-    // inserted between pc1 and pc2 (Define buttons: MiSTer keys maps by VID/PID):
+    // inserted between pc1 and pc2 (for Define buttons: MiSTer keys maps by VID/PID):
     //  pc8: GET_DESCRIPTOR(DEVICE, 18) SETUP+DATA0 (addr1) -> ACK
     //  pc9: data IN (addr1 ep0) -> DATAx, repeated until data bytes 8-11 are in (a 64-byte ep0
     //       brings all 18 at once; an 8-byte ep0 needs two packets) -> we ACK
@@ -495,7 +495,7 @@ module usb_fs_host (
                     else if (script_pc >= 4'd14) script_pc <= 4'd4;
                     else begin
                         script_pc <= 4'd2; dev_kind <= ls ? 2'd2 : 2'd0;
-                        // a failed configuration probe (pc11-13) keeps the identity the device descriptor already gave (the low-speed bench's stall=2 run);
+                        // a failed configuration probe (pc11-13) keeps the identity the device descriptor already gave (seen in the bench's stall=2 run);
                         // only a failed device descriptor read clears VID / PID / bcdDevice
                         if (script_pc < 5'd11) begin dev_vid <= 16'd0; dev_pid <= 16'd0; dev_ver <= 16'd0; t_clr <= 1'b1; len_dev <= 8'd0; end
                     end
@@ -586,7 +586,7 @@ module usb_fs_host (
                 // ⛔⛔ GATED ON ever_valid, NOT desc_valid -- THIS PATH WAS THE
                 // REMAINING SOURCE OF PHANTOM BUTTON PRESSES.
                 // It writes RAW, UN-CRC'd packet bytes into the very register
-                // the pad state is read from. The receive CRC gate
+                // the pad state is read from. The receive CRC gate (above)
                 // guards the REPORT path below; it never guarded this one.
                 // ⭐ THE SEQUENCE, as measured: a reflash or ROM load
                 // makes the controller miss polls -> fail_streak reaches 1500 ->

@@ -1,5 +1,8 @@
-// SPDX-License-Identifier: MIT
-// Copyright (c) 2026 the Tango authors
+// Gowin IP generator output: the PLL wrapper (the module with its pll_c1485_MOD and PLL_INIT instances and the PLL_INIT
+// defparams) that the Gowin IDE's PLL_ADV generator writes beside pll_c1485_mod.v; the generator's output carries
+// "Copyright (C)2014-2025 Gowin Semiconductor Corporation. All rights reserved."  Not under sys-tango's MIT licence;
+// see NOTICE ("Gowin IP templates").  Reformatted by the Tango authors; changed: the MDIV / MDIV_FRAC / DYN_MDIV
+// parameters, the irst, mdsel and mdsel_frac inputs and PLL_INIT's MULTI_FAC = MDIV.
 // MDIV / MDIV_FRAC (the TANGO_HDMI_PLL presets): tango_cfg.vh TANGO_HDMI_MDIV / _MDIV_FRAC from the board top; PLL_INIT's
 // MULTI_FAC = the integer MDIV (its ICP/LPF table has three buckets, <= 16 / 17..34 / > 34: every preset is in "> 34").
 // TANGO_HDMI_RETUNE: DYN_MDIV = "TRUE" -- MDIV from mdsel / mdsel_frac (tango_pll_retune, clocked by

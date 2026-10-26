@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # run_tb_ascal_ddr3.sh [config ...] -- the DDR3 real-netlist gate: TANGO_VIDEO_DDR3 + TANGO_VIDEO_F1
 # through the REAL ascal netlist (N_DW 128) and tango_ddr3 on the calibrated IP model (sim/tb_ascal_ddr3.v, its core
 # sim/tb_ascal_ddr3_core.v), then sim/check_ascal_ext.py on the frames.  Configurations (default: all):

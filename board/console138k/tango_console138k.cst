@@ -1,3 +1,11 @@
+// SPDX-License-Identifier: MIT AND GPL-3.0-only
+// Copyright (c) 2026 the Tango authors
+// The BL616 link block below (from "BL616 link" to the spi_irqn lines) is taken from A2600Nano
+// (https://github.com/MiSTle-Dev/A2600Nano, compared at commit fbc50ec), src/tang/console138k/a2600_top.cst lines 1
+// and 6-21: the jtagseln lines verbatim, and the pins, pulls and drives of the link ports (renamed).  a2600_top.cst
+// carries no licence header of its own; A2600Nano's LICENSE file is the text of the GNU General Public License
+// version 3, and neither says "or any later version": those lines are GPL-3.0-only.  The rest of this file is the
+// Tango authors' (MIT).  See NOTICE.
 // tango_sys_top138 (every Console 138K Tango core) on the Tang Console 138K (GW5AST-LV138PG484AC1/I0).
 // clk + HDMI (silicon-proven).
 IO_LOC "clk" V22; IO_PORT "clk" IO_TYPE=LVCMOS33 PULL_MODE=NONE;

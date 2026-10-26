@@ -2,12 +2,13 @@
 // Copyright (c) 2026 the Tango authors
 // tango_console138k_sdram.cst -- the Console 138K SDRAM module's pins, appended to the board cst by
 // build_core.sh for TANGO_SDRAM=1 cores (ports: sys/tango_sdram_ports.vh, MiSTer emu SDRAM_* names).
-// Ball map from two sources that agree on all 38 pins:
-//   nand2mario/nestang 5b24a71 src/boards/console.cst (IO_sdram_dq / O_sdram_addr / O_sdram_ba /
-//   O_sdram_dqm / O_sdram_clk / _wen_n / _ras_n / _cas_n / _cs_n F21 "was F19 on mega60k");
-//   the constraints of our own SDRAM march test on this board (0 errors on silicon).  No CKE ball on either
-//   (tied on the module).  DQML = dqm[0], DQMH = dqm[1].
-// LVCMOS33 as both sources.
+// Ball map: Sipeed's Tang Console 138K schematic, Tang_Mega_138K_Console_32001C__Schematics.pdf ("Tang_138K_Console_
+// V32001C", Rev 1.3; https://dl.sipeed.com/shareURL/TANG/Console/02_Schematic), the SDRAM0_* nets of
+// sheets SOM_BTB1 (p5) and FPGA_EXT_CONN (p8), and SOM_BTB0 (p4) for SDRAM0_~{CS} = F21: CLK B17, ~{CS} F21,
+// ~{RAS} F16, ~{CAS} E17, ~{WE} D16, BA0-1, A0-12, D0-15 and DM0 / DM1 (= DQML / DQMH below).  The document states
+// no licence or terms of use.  No CKE ball (tied on the module).  LVCMOS33: bank 2 runs at 3.3 V (VCCIO2 from the
+// 3.3 V rail, sheet POWER_TREE, p2).  nestang's console.cst (nand2mario/nestang 5b24a71) and the constraints of our
+// own SDRAM march test on this board name the same 38 balls; they are earlier references, not the source.
 IO_LOC "SDRAM_CLK" B17;
 IO_PORT "SDRAM_CLK" IO_TYPE=LVCMOS33;
 IO_LOC "SDRAM_nCS" F21;

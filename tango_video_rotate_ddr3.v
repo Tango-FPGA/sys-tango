@@ -145,7 +145,7 @@ module tango_video_rotate_ddr3 #(
     // generate-time check: only NBUF=4 is implemented (comment on the parameter above).
     generate
         if (NBUF != 4) begin : nbuf_not_implemented
-            $error("tango_video_rotate_ddr3: NBUF=%0d is not implemented, only NBUF=4's bank-aware allocator is (docs/ROTATION.md 7.3.2)", NBUF);
+            $error("tango_video_rotate_ddr3: NBUF=%0d is not implemented: NBUF must be 4 (the bank-aware allocator, two buffers in each of DDR3 banks 6 and 7, is the only one built)", NBUF);
         end
     endgenerate
 
@@ -251,8 +251,8 @@ module tango_video_rotate_ddr3 #(
     wire [1:0] wbuf_new_val = next_wbuf(alloc_ref);
 
     // ================= elastic FIFO: {b,g,r} ahead of the write FSM, drained at the DDR3's own pace =================
-    // PIXEL BYTE ORDER: each FIFO entry is {B,G,R}, so each 32-bit half of DDRAM_DIN below is {8'd0,B,G,R} =
-    // byte0 R, byte1 G, byte2 B. That is the
+    // PIXEL BYTE ORDER: each FIFO entry is
+    // {B,G,R}, so each 32-bit half of DDRAM_DIN below is {8'd0,B,G,R} = byte0 R, byte1 G, byte2 B. That is the
     // order ascal.vhd's 32bpp RGB reader takes (o_fb_format bit 4 = 0): avl_dw = swap(avl_readdata) (BYTESWAP
     // true) puts byte0 on top, shift_opack loads it at shift(0 TO 7), shift_opix reads r => shift(0 TO 7). It is
     // also MiSTer's own packing (sys/arcade_video.v: ram_data <= {8'd0,VGA_B,VGA_G,VGA_R}, FB_FORMAT 5'b00110).
@@ -465,7 +465,7 @@ module tango_video_rotate_ddr3 #(
     /* synthesis translate_off */
     always @(posedge clk_video)
         if (wr_addr_fire && fence_addr_fire)
-            $fatal(1, "TANGO CONTRACT: DDRAM_ADDR drivers not mutually exclusive (see docs/ROTATION.md 7.12, %m, %0t)", $time);
+            $fatal(1, "TANGO CONTRACT: DDRAM_ADDR drivers not mutually exclusive: wr_addr_fire and fence_addr_fire are both high in one clk_video cycle; at most one may be (%m, %0t)", $time);
     /* synthesis translate_on */
 
     // ================= CDC into clk_pix (ascal's o_clk): quasi-static, updated at frame boundary =================

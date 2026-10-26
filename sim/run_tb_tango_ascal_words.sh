@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # run_tb_tango_ascal_words.sh -- tango_ascal_words against an ascal-exact master and a stalling word memory
 # (sim/tb_tango_ascal_words.v), in four configurations; every one must print TB_RESULT PASS.
 #   base       ascal's traffic (32-beat bursts, all byte enables); the memory takes 60 % of clocks, reads 2..17 clocks

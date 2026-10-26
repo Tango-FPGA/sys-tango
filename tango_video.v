@@ -258,9 +258,9 @@ module tango_video #(
     // blanking; VGA_HS / VGA_VS / VGA_DE are sampled only on CE.  ascal reads i_vs / i_de only at i_ce clocks
     // (ascal.vhd 1162-1166: i_vs_pre / i_de_pre), starts an input frame on that VS rise (1180) and ends a line on that
     // DE fall (1220, 1427); the writer above measures the frame the same way (123-124).  MiSTer's sys/video_mixer.sv
-    // (Genesis_MiSTer adc0c42) changes VGA_VS / VGA_HS / VGA_DE only at CE_PIXEL clocks (188, 206-215).  A core that
-    // pulsed CE only inside the picture never started an ascal frame: the screen showed ascal's no-input
-    // picture.
+    // (Genesis_MiSTer adc0c42) changes VGA_VS / VGA_HS / VGA_DE only at CE_PIXEL clocks (188, 206-215).  nes-tango once
+    // pulsed CE only inside the picture: ascal never started a frame and the silicon showed its no-input
+    // picture (since fixed).
     // Checked per input frame, from one VGA_VS rise on CLK_VIDEO to the next (sampled every clock, CE or not):
     //   (a) CE_PIXEL pulses with VGA_DE low: at least one;
     //   (b) the VGA_VS rise is seen at a CE_PIXEL clock (VGA_VS high there, low at the CE clock before);
@@ -532,8 +532,8 @@ module tango_video #(
 
 `ifndef TANGO_SIM
     // ---- ascal's output sweep onto this module's beam.  ascal.vhd's OSWEEP counters have no reset: they
-    // count from configuration, so ascal's frame lands at an arbitrary offset from hdmi.sv's beam (on
-    // silicon: 613 pixels, 45 lines, wrapped).  rgb at clock t is for the beam (cx, cy) of t-VLAT and is
+    // count from configuration, so ascal's frame lands at an arbitrary offset from hdmi.sv's beam (on silicon,
+    // e.g. 613 pixels, 45 lines, wrapped).  rgb at clock t is for the beam (cx, cy) of t-VLAT and is
     // made from ascal's output of t-2, so ascal's output must be for the beam of the same clock: its vsync
     // rises at (o_hsstart, o_vsstart).  A rise anywhere else holds o_ce low for the difference (at most one
     // frame, once); every later rise is on target.

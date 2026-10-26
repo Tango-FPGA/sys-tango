@@ -1,8 +1,20 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Copyright (c) 2026 the Tango authors
+# Copyright (C) 2020 Sorgelig (sys/iir_filter.v)
+# (c)2020-2026 Alexey Melnikov (sys/audio_out.sv)
+#
+# This file is derived from MiSTer's audio filter and mix: the MiSTer project's Template_MiSTer
+# (https://github.com/MiSTer-devel/Template_MiSTer, compared at commit 5dda373), sys/iir_filter.v (modules IIR_filter,
+# iir_filter_tap, DC_blocker) and sys/audio_out.sv (module aud_mix_top), whose arithmetic it models step by step.
+# Both files state: "This program is free software; you can redistribute it and/or modify it under the terms of the
+# GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at
+# your option) any later version."  This file is under the same terms (GPL-2.0-or-later; LICENSES/GPL-2.0.txt,
+# LICENSES/GPL-3.0.txt), not under the MIT licence of the rest of sys-tango; see NOTICE.
+# This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 """iir_model.py -- the bit-exact model of tango_audio_filter.v (README "Video and audio processing"): MiSTer's 3-tap IIR
-arithmetic (Template_MiSTer 19e89ce sys/iir_filter.v 52-97, 181-208, read for behaviour only) on Python integers,
+arithmetic (Template_MiSTer 5dda373 sys/iir_filter.v 52-97, 181-208) on Python integers,
 the 48 kHz hand-over and MiSTer's DC blocker (iir_filter.v 211-235), with the RTL's own scheduling.
 
   iir_model.py check <alog> [--json <tables.json>]   (+ the mix stage: MiSTer's aud_mix_top, audio_out.sv 281-345)

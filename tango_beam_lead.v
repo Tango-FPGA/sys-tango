@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 the Tango authors
 // tango_beam_lead.v -- verbatim copy of the tango_beam_lead module from tango_overlay.v
-// (the launcher's earlier overlay).  tango_overlay.v keeps its copy for its reference build; the
+// tango_overlay.v keeps its copy for the reference ov138 build; the
 // menu core (tango_menu_core) uses this file and never includes tango_overlay.v.
 `default_nettype none
 //------------------------------------------------------------------------------

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 the Tango authors
 //==============================================================================
 // tango_ddr3_skid_ref -- a 2-entry queue whose input ready is a register: the producer's logic never waits on the
 // consumer's same-clock decision (the consumer pops the head combinationally, e.g. from the DDR3 IP's cmd_ready).

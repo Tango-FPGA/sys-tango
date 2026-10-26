@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # build_core.tcl -- build a Tango core for the Tang Console 138K: the framework (sys/) + the core's
 # files.  Driven by build_core.sh through environment variables:
 #   TANGO_ROOT        the core's checkout (sys/ lives here)
@@ -85,7 +87,7 @@ set_option -include_path $env(TANGO_INC)   ;# tango_cfg.vh + copies of sys/*.vh 
 set_option -verilog_std sysv2017
 set_option -vhdl_std vhd2008          ;# cores may bring VHDL (A2600: A2600Nano's A2601 uses VHDL-2008, as its own build)
 # tango_conf_rom's generate loop runs 32 x ceil(len / 32) times: 4096 for the longest CONF_STR (4095 bytes,
-# 12-bit conf_addr).  GowinSynthesis stops a loop at 2000 by default (SUG100-4.4.2E
+# 12-bit conf_addr; README "Using it in a core").  GowinSynthesis stops a loop at 2000 by default (SUG100-4.4.2E
 # p.104 "-looplimit"), so any CONF_STR over 2000 bytes failed with EX3934 (NES_MiSTer fit check, 2276 bytes).
 set_option -looplimit 4096
 set_option -use_jtag_as_gpio 1

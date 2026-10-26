@@ -2,7 +2,7 @@
 // Copyright (c) 2026 the Tango authors
 //==============================================================================
 // tango_sd -- MiSTer's block device for cores (save RAM, disk images), built with TANGO_SD.
-// menu-tango docs/spec/tango-spec.html "Core contract" -> "Block device".  Core ports and meanings as Template_MiSTer
+// README "The core interface".  Core ports and meanings as Template_MiSTer
 // sys/hps_io.sv 128-143 (master 3ea1134): the core raises sd_rd[d] / sd_wr[d] with sd_lba[d] and
 // sd_blk_cnt[d] (blocks - 1); sd_ack[d] is high for the whole transfer (hps_io.sv 329-331, 312-316); a read
 // hands every byte over as sd_buff_dout with a one-clock sd_buff_wr at sd_buff_addr 0, 1, 2, ... (293-297,

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # run_tb_rotate.sh -- the rotation client's benches (the three below, plus rotate_galaga / rotate_geo / rot_scale):
 #   tb_rotate_beat    the allocator/beat FSM (no cport)           -> TB_RESULT PASS, bank/overwrite violations 0
 #   tb_rotate_golden  pixel-exact address algebra (no cport)      -> TB_RESULT PASS, live per-write 0 mismatches

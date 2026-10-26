@@ -25,7 +25,7 @@ module tango_ddr3_fifo #(
     reg [W-1:0]  mem [0:(1<<AW)-1];
     reg [AW:0]   wp = 0, rp = 0;
     // the words in the memory, a register, and "not empty", a register (timing: wp - rp -> != 0 -> load -> q_valid
-    // failed clk_x1 by 0.215 ns in an earlier Template core DDR3 build); both next values are computed for a load and
+    // failed clk_x1 by 0.215 ns in a Template DDR3 build); both next values are computed for a load and
     // for none from registers, and the late load only selects
     reg [AW:0]   inmem = 0;
     reg          ne = 1'b0;
@@ -34,7 +34,7 @@ module tango_ddr3_fifo #(
     wire load = ne && (!q_valid || pop);
     // the candidates are kept as nets of their own (syn_keep, the comment form of the board top's spi_sck_clk), so
     // synthesis cannot fold the load into their adders
-    // (it did: an earlier build failed by 0.485 ns on load -> inmem's carry chain)
+    // (it did: the first build of this failed by 0.485 ns on load -> inmem's carry chain)
     wire [AW:0] n0 /* synthesis syn_keep = 1 */ = inmem + (we ? 1'b1 : 1'b0);           // no load
     wire [AW:0] n1 /* synthesis syn_keep = 1 */ = inmem + (we ? 1'b1 : 1'b0) - 1'b1;    // a load
     wire        ne0 /* synthesis syn_keep = 1 */ = we || ne;                            // n0 != 0

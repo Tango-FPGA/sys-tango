@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # run_tb_tango_ddr3.sh -- tango_ddr3 (V port, core port, arbiter) on the IP model (sim/tb_tango_ddr3.v), in four
 # configurations; each must print TB_RESULT PASS:
 #   base        random V (ascal-exact) and C (MiSTer DDRAM, bursts 1..64, gaps) traffic, Q_CORE 8

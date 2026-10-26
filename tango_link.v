@@ -5,9 +5,10 @@
 // wire format (targets SYS 0, HID 1, OSD 2), with target 2 carrying Tango's OSD
 // commands.  Our own RTL, written to the protocol as the Companion FIRMWARE uses it
 // (bl616/companion/src, Apache-2.0).  No MiSTle HDL was copied (A2600Nano's
-// mcu_spi.v / sysctrl.v / hid.v, GPL-3, were read for behaviour only; see below).
+// mcu_spi.v / sysctrl.v / hid.v and sd_card.v, GPL-3, were read for behaviour only; the SD
+// STATUS reply below follows sd_card.v's layout; see below and NOTICE).
 //
-// ---- Wire (menu-tango docs/TANGO-SPEC.md "Link protocol"; firmware facts; line numbers are those of
+// ---- Wire (FPGA Companion's wire format, unchanged; README "Features"; firmware facts; line numbers are those of
 //      MiSTle-Dev/FPGA-Companion src/ at ccb06d2, as menu-tango bl616/companion carries it) --------
 //  * SPI mode 1, MSB first: idle SCK low, data changes on the rising edge and is sampled
 //    on the falling edge (mcu_hw.c 1039-1045: SPI_MODE1, SPI_BIT_MSB; SPI.md 44-46).
@@ -73,7 +74,7 @@
 //                  joy is MiSTer order: 0 R, 1 L, 2 D, 3 U, 4 A, 5 B, 6 X, 7 Y, 8 L,
 //                  9 R, 10 Select, 11 Start; menu.c 1351-1368 uses bits 0-5 of byte 3.
 //  cmds 1-3 (keyboard/mouse/joystick into the core): accepted, no effect.
-//  cmd 0x12 REPORT (menu-tango docs/spec "Define buttons")  01 12 port: byte 3 = {4'b0, A2 changed, A2 connected,
+//  cmd 0x12 REPORT (README "Controllers")  01 12 port: byte 3 = {4'b0, A2 changed, A2 connected,
 //                  A1 changed, A1 connected} (both ports: byte 3 is answered before `port` arrives);
 //                  bytes 4-11 = VID, PID, raw[31:0] of `port` (0 USB-A1, 1 USB-A2), big-endian, taken
 //                  in one clock (byte 4 live, 5-11 from the snapshot of that clock), which clears that
@@ -93,7 +94,7 @@
 //                      after CSN rises; the port's engine is held from the first byte until 10 clocks after.  An incomplete table = mode 0.
 //  cmd 0x19 DECODE_STATUS 01 19 port: b3 D1, b4 0, b5 mode, b6 count, b7 {desc rdy, live-and-owned, hold, busy}, b8 transfers accepted, b9 64.
 //  cmd 0x1A PAD_CTRL   01 1A bits: bit0 ext events (HID interrupt also on live / descriptors-ready changes), bit1 swap the core's joystick words.
-// ---- OSD target 2: Tango (menu-tango docs/TANGO-SPEC.md "OSD commands (target 2)") ----------
+// ---- OSD target 2: Tango (replaces the Companion's OSD target; README "Features") ----------
 //  0x01 ENABLE b2 bit0 | 0x02 WRITE ignored (no 128x64 buffer) | 0x10 CAPS bytes 3..15
 //  | 0x11 GEOMETRY | 0x12 PALETTE | 0x13 ATLAS | 0x14 GLYPHS | 0x15 ROWS | 0x16 SWAP
 //  | 0x17 STATUS byte 3 = {6'b0, swap pending, shown bank}.  Multi-byte fields are
@@ -153,7 +154,7 @@ module tango_link #(
     output reg             ext_en = 1'b0,       // PAD_CTRL bit0
     output reg             pad_swap = 1'b0,     // PAD_CTRL bit1
     output reg  [10:0]     ps2_key = 11'd0,     // MiSTer ps2_key (hps_io.sv 258-310), from HID KEYBOARD (1)
-    // block device (tango_sd; menu-tango docs/spec "Block device"): the core's posted block request, the sector buffers
+    // block device (tango_sd; README "The core interface"): the core's posted block request, the sector buffers
     input  wire [38:0]     sd_req,              // {seq, valid, write, drive[3:0], lba[31:0]}, clk domain
     output reg             sd_in_we = 1'b0,
     output reg  [8:0]      sd_in_wa = 9'd0,
@@ -286,7 +287,7 @@ module tango_link #(
     reg  [15:0] ahead_n = 16'd1;                // index of the byte rep_ahead answers
     wire [15:0] nidx = ahead_n;
     // reply pre-decode (clk_pix margin): the reply mux (rsp -> rep_ahead) decided on 16-bit compares of ahead_n
-    // and 8-bit compares of tgt / cmd in the clock it loads rep_ahead (one NES build: ahead_n -> rsp ->
+    // and 8-bit compares of tgt / cmd in the clock it loads rep_ahead (an NES build: ahead_n -> rsp ->
     // rep_ahead +1.362 ns).  The same decisions are now flops, loaded in the SAME clocks as the values they
     // decode (ahead_n, tgt, cmd, sdc_sub), so they are never stale and every reply is computed in the same clock.
     reg         a_ge3 = 1'b0;                   // ahead_n >= 3
@@ -421,7 +422,7 @@ module tango_link #(
     reg  [9:0]  sd_cnt = 10'd0;                 // CORE_SECTOR_IN bytes / CORE_SECTOR_OUT reads of this transfer
     reg         sd_ok = 1'b0;                   // this transfer matches the shown request
     reg         mnt_dirty = 1'b0;
-    wire        sdc_int = (dl_open && (dl_offer >= 12'd256)) || sd_shown;   // level (menu-tango docs/TANGO-SPEC.md "Cores")
+    wire        sdc_int = (dl_open && (dl_offer >= 12'd256)) || sd_shown;   // a level: an IRQ ack does not clear it
 `ifdef TANGO_PRESET_STATUS
     reg  [127:0] st_stage = `TANGO_PRESET_STATUS;
 `else
@@ -777,7 +778,7 @@ module tango_link #(
     reg  [ATW-9:0] aw = 0;                      // atlas word bytes so far
     reg  [9:0]  acol = 10'd0;
     // ATLAS column size: GEOMETRY byte 11 = glyph rows -> ceil(rows / 4) bytes per column
-    // (menu-tango docs/TANGO-SPEC.md "OSD commands": "it also sets the ATLAS column size"), taken
+    // (the one GEOMETRY field that also governs ATLAS), taken
     // at once (the frame-latched copy in the overlay is irrelevant for ATLAS), clamped to
     // 1..BPC.  Default = the atlas height of this build.  Shorter columns are stored
     // zero-extended: coverage of glyph row gy stays at bits 2gy+1:2gy.

@@ -4,9 +4,9 @@
 // tango_menu_overlay -- the Tango menu renderer for the menu core, fed entirely by
 // the BL616 over the SPI link (tango_link).  No built-in page: the atlas, both glyph
 // banks, both row banks, the palette and the geometry are written by OSD commands
-// (menu-tango docs/TANGO-SPEC.md "OSD commands (target 2)", "FPGA memory", "Renderer").
+// (OSD target 2, tango_link.v; README "Features"; the memories are listed below).
 //
-// Derived from tango_overlay.v (the launcher's earlier overlay, gated 0 mismatches vs the model), with:
+// Derived from tango_overlay.v (gated 0 mismatches vs the model), with:
 //   - the TEST-ONLY start-up copier and its logic ROMs removed; the three BSRAMs
 //     get a write port driven by the link (GW5A BSRAM initial contents do not
 //     survive on silicon, so nothing here relies on RAM init);
@@ -29,7 +29,7 @@
 //   rtab    128 x 32   2 banks x 32 rows x 2 words (word 2r = entry[31:0], 2r+1 = [63:32]);
 //            content rows (0-30) pack first glyph = bits[8:0] of word 2r plus bit 9 stolen from
 //            word 2r+1 bit 30 (that bit was always unused: texty there is <= 5 bits in practice,
-//            menu-tango docs/TANGO-SPEC.md "FPGA memory" marks 63:62 reserved); row 31 (banner) has no bar/rule
+//            and entry bits 63:62 carry no other field); row 31 (banner) has no bar/rule
 //            fields, so it packs first = bits[9:0] / count = bits[16:10] of word 2r directly, no
 //            stolen bit needed.
 //   palette 16 x RGB888 + K (index 16) in flops, staged + live
@@ -176,7 +176,7 @@ module tango_menu_overlay #(
     // the runtime height minus one, REGISTERED: fh_rt (hdmi.sv's frame_height) changes only at the raster's wrap (local
     // modification 3), and ny_c's wrap compare matters only on the frame's last line, so one clock of latency is invisible
     // here; the subtraction (and the logic the synthesiser shares with tango_beam_lead_rt) leaves the clk_pix path
-    // fh_r -> ny_c -> n_in (18 levels: an Atari 2600 TANGO_VSYNC_ADJUST build missed clk_pix by 0.404 ns on it)
+    // fh_r -> ny_c -> n_in (18 levels: an Atari 2600 vsync-candidate build missed clk_pix by 0.404 ns on it)
     reg  [10:0] fh_m1 = 11'(FH - 1);
     always @(posedge clk) fh_m1 <= fh_rt - 11'd1;
     wire [10:0] ny_c  = (cy == fh_m1) ? 11'd0 : cy + 11'd1;
@@ -408,8 +408,8 @@ module tango_menu_overlay #(
     end
     // s0 -> s1 precompute (clk_pix margin): everything s1 decides from the pixel position alone is computed here
     // from lx0 (= s1_lx's D) and registered with it, so s1 is only flops -> small muxes -> s2 (s1_lx -> strip /
-    // banner compare -> banner column select -> 5:1 colour mux -> s2_c was the worst clk_pix path of the
-    // launcher build it was measured in, +0.592 ns).  The line registers used here (l_bx, l_bnw, l_bnv, l_bar, l_bx0, l_bx1,
+    // banner compare -> banner column select -> 5:1 colour mux -> s2_c was the worst clk_pix path of a
+    // menu build, +0.592 ns).  The line registers used here (l_bx, l_bnw, l_bnv, l_bar, l_bx0, l_bx1,
     // c_acc, c_bn*) are thus read one clock earlier than before; they only change during the line setup, which
     // starts at SETUP_X (after the 1280 visible pixels), so no panel pixel sees a difference.  Same latency.
     wire [10:0] lx0s   = lx0[10:0];

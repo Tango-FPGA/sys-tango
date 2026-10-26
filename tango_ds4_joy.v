@@ -21,7 +21,7 @@
 //   byte 6 = {R3, L3, options, share, R2, L2, R1, L1}
 //   byte 7 = {counter[5:0], touchpad, PS}
 // Outputs, all from the same captured bytes and the same arm-after-quiet gate, one register:
-//   raw  [31:0]  the pad's buttons (menu-tango docs/spec "Define buttons"): 0 right, 1 left, 2 down, 3 up (hat),
+//   raw  [31:0]  the pad's buttons (README "Controllers"): 0 right, 1 left, 2 down, 3 up (hat),
 //                4 cross, 5 circle, 6 square, 7 triangle, 8 L1, 9 R1, 10 L2, 11 R2, 12 share,
 //                13 options, 14 L3, 15 R3, 16 PS, 17 touchpad, 31:18 = 0
 //   joy  [15:0]  the FIXED default decode (the menu's map, MiSTer's def_mmap: GET_DB9, Start+Select),

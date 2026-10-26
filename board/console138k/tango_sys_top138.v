@@ -72,7 +72,7 @@ module tango_sys_top138 #(
     output wire        SDRAM_nCS, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nWE
 `endif
 );
-    // ---- JTAG hand-back -- EXACTLY the A2600Nano Console 138K arrangement, which runs on this board
+    // ---- JTAG hand-back -- EXACTLY the A2600Nano Console 138K arrangement (GPL-3.0; NOTICE), which runs on this board
     // with our firmware (on silicon): a top-level port jtagseln = NOT bl616_jtagsel
     // (a2600_top.vhd 321) with NET_LOC "jtagseln" V_JTAGSELN + PULL_MODE=DOWN (a2600_top.cst 6-7).
     // The PnR does not honour V_JTAGSELN on a port: it places the port on an ordinary IO (A2600: T16);

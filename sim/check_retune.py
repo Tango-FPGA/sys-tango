@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 """check_retune.py <run.log> --fpix <Hz> --fixed WxH --plan WxH -- judges sim/tb_retune.v (the HDMI PLL retune at
 core start, the clock-pause design: frames spanning a pause are marked PAUSED and not judged).
 Every steady VS period (clk_pix count == W x H of the raster printed with it) must last exactly W x H / f_pix in real time,

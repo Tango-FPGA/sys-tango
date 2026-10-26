@@ -1,8 +1,10 @@
-// SPDX-License-Identifier: MIT
-// Copyright (c) 2026 the Tango authors
+// Gowin IP generator output: the PLL wrapper (the module with its pll_ddr3_MOD and PLL_INIT instances and the PLL_INIT
+// defparams) that the Gowin IDE's PLL_ADV generator writes beside pll_ddr3_mod.v; the generator's output carries
+// "Copyright (C)2014-2025 Gowin Semiconductor Corporation. All rights reserved."  Not under sys-tango's MIT licence;
+// see NOTICE ("Gowin IP templates").  Reformatted by the Tango authors; changed: the enclk2 input and the clkout2 output.
 // pll_ddr3 -- 50 MHz board clock -> the DDR3 IP's memory_clk (400 MHz, CLKOUT2, gated by the IP's pll_stop on
 // ENCLK2) and a free-running 100 MHz reference (CLKOUT0), with PLL_INIT as every Console 138K PLL (pll_c1485.v;
-// a GW5AST PLL needs PLL_INIT; Sipeed's DDR3 test gowin_pll.v: MULTI_FAC 16, CLK_PERIOD 20).
+// a GW5AST PLL without PLL_INIT does not lock; Sipeed's DDR3 test gowin_pll.v: MULTI_FAC 16, CLK_PERIOD 20).
 // Place at PLL_L[0]: INS_LOC "<inst>/u_pllm/PLL_inst" PLL_L[0] (check the name in
 // the timing report: GowinSynthesis renamed a same-named inner instance to u_pll_0 in an earlier build).
 module pll_ddr3(clkin, init_clk, enclk2, clkout0, clkout2, lock);

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 """run_ddr3_matrix.py -- the DDR3 scaler port's margin matrix.
 
 For each source x output window (sim/tb_tango_ascal_stream_ddr3.v, one plusarg set per run):

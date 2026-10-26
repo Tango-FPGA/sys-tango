@@ -67,8 +67,8 @@ module tango_ddr3_vport #(
     reg [27:0] wa = 28'd0;                                 // address of the next beat
     // room for a command: a register, conservative by one (each count grows by at most one a clock) (timing).
     // None in reset: rst is high until the IP has calibrated (tango_sys), and ascal must wait for it with
-    // waitrequest -- without this the FIFOs, held in reset, showed room, so commands and beats were taken and
-    // dropped (seen in sim/tb_ascal_ddr3.v: ascal's first write burst and reads before calibration)
+    // waitrequest -- without this the FIFOs, held in reset, showed room, so commands and beats
+    // were taken and dropped (sim/tb_ascal_ddr3.v: ascal's first write burst and reads before calibration)
     reg  can_cmd = 1'b0;
     always @(posedge clk) can_cmd <= !rst && (cq_n + 1'b1 < (1 << CQ_LOG2)) && (wq_n + 1'b1 + WQ_RES <= (1 << WQ_LOG2));
     assign avl_waitrequest = inb ? 1'b0 : !can_cmd;
@@ -81,7 +81,7 @@ module tango_ddr3_vport #(
         else if (take_beat) inb <= (bl != 8'd1);
         if (take_beat) begin wa <= ba + 1'b1; if (bl != 8'd1) wleft <= bl - 1'b1; end
     end
-    // ---- the beats into IP words, in two stages (timing: an earlier Template core DDR3 build with TANGO_VIDEO_PROC
+    // ---- the beats into IP words, in two stages (timing: a Template + TANGO_VIDEO_PROC DDR3 build
     // failed clk_x1 by 0.44 ns on wleft -> "last beat?" -> the enable of the 288-bit posting register, a 6 ns route).
     // Stage 1 registers the beat and its decisions; stage 2 pairs beats into words from registers only.  Every select
     // and enable of the wide registers is a register of its own, one copy per 32-bit lane (syn_preserve).
@@ -153,7 +153,7 @@ module tango_ddr3_vport #(
     reg [27:0] sa = 28'd0;                                   // its next beat address
     reg [8:0]  sn = 9'd0;                                    // beats left (0 = the splitter is empty)
     // sn != 0 and sn == 1 as registers (timing: sn -> "empty / one beat left?" -> w_go -> the posting FIFO's pop was
-    // the worst path of earlier Template core DDR3 builds): next values from registers, selected by the late go
+    // the worst path of earlier Template DDR3 builds): next values from registers, selected by the late go
     reg        sn_nz = 1'b0, sn_one = 1'b0;
     wire [8:0] sn_m1 = sn - 9'd1, sn_m2 = sn - 9'd2;
     function automatic win(input [27:0] a);
@@ -162,7 +162,7 @@ module tango_ddr3_vport #(
     wire q_free  = !q_valid || q_ready;                      // q can take the next request this clock
     // room for a read's word: the words reserved (out at the IP, in the buffer, a read in q) grow by at most one a
     // clock (a read into q), so a register of "room for one more" is safe a clock later (timing: the return buffer's
-    // count -> the splitter's issue failed an earlier build by 1.46 ns)
+    // count -> the splitter's issue failed tp2 of a build by 1.46 ns)
     reg  rb_ok = 1'b1;
     always @(posedge clk) rb_ok <= (rb_out + rb_n + ((q_valid && !q_write) ? 1'b1 : 1'b0) + 1'b1) < (1 << RB_LOG2);
     wire w_go    = q_free && sn_nz && sp_w && wq_v;

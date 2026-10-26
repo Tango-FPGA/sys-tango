@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 the Tango authors
 // tb_ul_lim_equiv.v -- equivalence of tango_link.v's REAL
 // tango_ul_lim module (the two-stage, one-subtractor ul_lim feeding a_ulr, a clk_pix margin fix) against the
 // ORIGINAL a_ulr two-sum expression it replaced, driven with the real 2-clock lag.
@@ -53,9 +55,9 @@ module tb_ul_lim_equiv;
     function automatic mid_new(input [23:0] lim, input [15:0] an);
         mid_new = ({8'd0, an} < lim);
     endfunction
-    // the original ul_lim (single-register form) -- value oracle for ul_lim itself
-    function automatic [23:0] lim_d5297e2(input [23:0] off, input [23:0] sz);
-        lim_d5297e2 = (off > (sz + 24'd4)) ? 24'd0 : (sz + 24'd4 - off);
+    // the original ul_lim (single-register form: one register, no pipeline stage) -- value oracle for ul_lim itself
+    function automatic [23:0] lim_single_reg(input [23:0] off, input [23:0] sz);
+        lim_single_reg = (off > (sz + 24'd4)) ? 24'd0 : (sz + 24'd4 - off);
     endfunction
 
     integer mism_p0 = 0, mism_p1 = 0, mism_p2 = 0, mism_p4 = 0, mism_p3 = 0, mism_lim = 0;
@@ -74,7 +76,7 @@ module tb_ul_lim_equiv;
         reg [15:0] an; integer k, bad, eff; reg o, n; reg [23:0] want_lim;
         begin
             bad = 0;
-            want_lim = lim_d5297e2(off, sz);
+            want_lim = lim_single_reg(off, sz);
             if (ul_lim !== want_lim) begin
                 mism_lim = mism_lim + 1;
                 if (mism_lim <= 10) $display("LIM VALUE MISMATCH part%0d sz=%0d off=%0d got=%0d want=%0d", part, sz, off, ul_lim, want_lim);
@@ -179,7 +181,7 @@ module tb_ul_lim_equiv;
             end
         $display("PART 3 (wrap domain, ul_off near 2^24): %0d checks, %0d mismatches vs the ORIGINAL two-sum (NONZERO IS EXPECTED: documented out-of-domain divergence; the clamped form is the correct one there)", n_p3, mism_p3);
 
-        $display("ul_lim VALUE vs the d5297e2 single-register form: %0d mismatches over every check above", mism_lim);
+        $display("ul_lim VALUE vs the single-register reference form: %0d mismatches over every check above", mism_lim);
         if (mism_p0 == 0 && mism_p1 == 0 && mism_p2 == 0 && mism_p4 == 0 && mism_lim == 0) begin
             $display("EQUIV SWEEP: PASS");
             $finish(0);

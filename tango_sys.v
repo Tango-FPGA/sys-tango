@@ -219,7 +219,7 @@ module tango_sys #(
     // The core colours the beam ccx/ccy with 2 clocks of latency (tango_core_ports.vh).  Its colour is
     // registered once more here (bg_q) before the overlay: the core's VID_RGB may be combinational after its
     // last register (e.g. a2600_fb.v's scanline mux), and the overlay's first stage (translucent blend + add,
-    // tango_menu_overlay s1) must start from a flop -- an Atari 2600 core build missed clk_pix by 0.509 ns on
+    // tango_menu_overlay s1) must start from a flop -- an A2600 build missed clk_pix by 0.509 ns on
     // exactly that path.  The overlay takes its background one clock after its own beam, so:
     //   core beam    = hdmi.sv beam + LAT          (tango_beam_lead D = LAT = OV_LAT + 1)
     //   core colour  = VID_RGB at clock t is for ccx(t-2) = hdmi(t+LAT-2); bg_q at t is for hdmi(t+LAT-3)
@@ -713,7 +713,7 @@ module tango_sys #(
 `endif
         .out_l(audio_l), .out_r(audio_r), .dbg_step(), .dbg_s48());
 `endif
-    // block device (menu-tango docs/spec "Block device"): tango_sd in TANGO_SD builds, else no request is ever posted
+    // block device (README "The core interface"): tango_sd in TANGO_SD builds, else no request is ever posted
     wire [38:0] sd_req;  wire sd_in_we, sd_in_done, sd_out_done, mnt_tog, mnt_ro;
     wire [8:0]  sd_in_wa, sd_out_ra;  wire [7:0] sd_in_wd, sd_out_rd;  wire [3:0] mnt_drive;  wire [63:0] mnt_size;
     wire [135:0] link_dbg;
@@ -759,7 +759,7 @@ module tango_sys #(
 
     // ---------------------------------------------------------------- clk48 -> clk_pix
     // per port: joy = the fixed default decode (GET_DB9, the menu, Start+Select: MiSTer's def_mmap),
-    // c = the core map applied (joystick_0/1), r = the raw buttons, vid/pid (REPORT); menu-tango docs/spec "Define buttons"
+    // c = the core map applied (joystick_0/1), r = the raw buttons, vid/pid (REPORT); README "Controllers"
     wire [15:0] j1, j2;  wire p1, p2;
     wire [31:0] c1, c2, r1, r2;  wire [15:0] vid1, pid1, vid2, pid2;
     wire [383:0] pm1, pm2;

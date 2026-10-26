@@ -1,9 +1,22 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 the Tango authors
+//
+// This file is derived from MiSTer's shadow mask: the MiSTer project's Template_MiSTer
+// (https://github.com/MiSTer-devel/Template_MiSTer, compared at commit 5dda373), sys/shadowmask.sv (module
+// shadowmask): its command decode, LUT, counters and per-colour multiply, in its order and with its register names
+// (hmax, vmax, lut, ...).  shadowmask.sv carries no copyright or licence header of its own and states no licence
+// version; Template_MiSTer's LICENSE file is the text of the GNU General Public License version 2.
+// GPLv2 section 9: "If the Program does not specify a version number of this License, you may choose any version
+// ever published by the Free Software Foundation."
+// On that basis this file is under the GNU General Public License version 2 or (at your option) any later version
+// (GPL-2.0-or-later; LICENSES/GPL-2.0.txt, LICENSES/GPL-3.0.txt), not under the MIT licence of the rest of
+// sys-tango; see NOTICE.  A bitstream that contains it is a work under the GPL.
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 //==============================================================================
-// tango_shmask -- MiSTer's shadow mask (README "Video and audio processing"), our own code, on the scaled picture
+// tango_shmask -- MiSTer's shadow mask (README "Video and audio processing"), on the scaled picture
 // after the scaler (and the framework's scanline dimming), before the OSD, as MiSTer's sys_top.v 1156-1176 places
-// its shadowmask.sv (Template_MiSTer 19e89ce, read for behaviour only).
+// its shadowmask.sv (Template_MiSTer 5dda373).
 //
 // Commands (SYS 0x3E words, MiSTer's: Main_MiSTer video.cpp 808-815, shadowmask.sv 130-145):
 //   15:13 = 000  bits 3:1 = {enable, rotate, 2x}; the LUT index restarts at 0

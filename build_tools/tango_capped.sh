@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # tango_capped.sh -- run a heavy job (Gowin build, Verilator sim) inside its own
 # memory-capped cgroup so a runaway is OOM-killed INSIDE the box instead of
 # thrash-freezing the machine (a 15 GB RAM, 2 GB swap machine froze that way).

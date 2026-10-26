@@ -49,7 +49,7 @@ module tango_ddr3_cport #(
     reg        inb = 1'b0;
     reg [7:0]  left = 8'd0;
     // the clk_ddr side out of reset (rst: until the IP has calibrated), synchronised to DDRAM_CLK: the core waits on
-    // DDRAM_BUSY until then (as the V port does) -- without it the async FIFOs' write
+    // DDRAM_BUSY until then (DDR3.md 5.4 rule 1, as the V port) -- without it the async FIFOs' write
     // sides showed room while their read sides were held in reset, and the core's commands were taken and lost
     reg  [1:0] rdy_s = 2'b00;
     always @(posedge DDRAM_CLK) rdy_s <= {rdy_s[0], !rst};

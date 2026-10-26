@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # run_tb_ddr3_arb_equiv.sh [mutants] -- the lockstep equivalence bench (sim/tb_ddr3_arb_equiv.v) of tango_ddr3_arb against
 # sim/ddr3_arb_ref (the arbiter before its timing fix).  Without an argument: the configurations must all
 # print TB_RESULT PASS.  With `mutants`: each mutant of the tree's arbiter / queue (made on a copy) MUST print FAIL

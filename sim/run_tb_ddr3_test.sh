@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # run_tb_ddr3_test.sh -- the DDR3 bring-up test's statistics RAM alone (sim/tb_ddr3_rmw.v: back-to-back
 # read-modify-writes against a model), then the test's logic on the IP model (sim/tb_ddr3_test.v) in four configurations, each must print
 # TB_RESULT PASS; then the base run's displayed bank through the results screen and the UART (sim/tb_ddr3_ui.v), and

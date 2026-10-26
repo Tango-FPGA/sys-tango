@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 the Tango authors
 // tango_console138k_sdram162.sdc -- clk_sdram constraint for TANGO_VIDEO_ASCAL builds.
 // Appended by build_core.sh when TANGO_VIDEO_ASCAL=1 (after the board's base SDC).
 // clk_sdram = Gowin_PLL_SDRAM162 clkout0, 162 MHz: tango_sdram + ascal Avalon.

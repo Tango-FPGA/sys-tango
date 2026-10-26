@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # run_tb_tango_ascal_stream_ddr3.sh -- the DDR3 scaler port under ascal's read machine, a core streaming flat out and
 # the stall patterns below (sim/tb_tango_ascal_stream_ddr3.v), as a gate.
 # The bench's knobs are run-time plusargs (stall, stall_len, stall_line, adv, core, launcher, win_w, iphase, oframes,

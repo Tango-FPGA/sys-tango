@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 the Tango authors
 // tango_console138k_ddr3.sdc -- TANGO_VIDEO_DDR3 builds (build_core.sh appends it, and adds both clocks to the build's
 // one set_clock_groups line as groups of their own unless that line has them already): the DDR3 IP's clocks, as the
 // DDR3 bring-up test's ddr3/test/tango_ddr3_test.sdc (Sipeed's ddr3_1v4_hs.sdc): memory_clk 400 MHz (pll_ddr3

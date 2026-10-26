@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # build_core.sh -- build a Tango core for the Tang Console 138K and archive the bitstream.
 #   sys/board/console138k/build_core.sh <name> <core.sdc or -> <core HDL files...>
 #     <name>      output / archive name, e.g. tango_template138 (debug builds: add TANGO_DBG=1)
@@ -156,7 +158,7 @@ if [ "${TANGO_VIDEO_OPTS:-0}" = 1 ]; then   # the framework's Video options (sys
     printf '`define TANGO_VIDEO_OPTS\n' >> "$DEFS"
 fi
 if [ "${TANGO_VIDEO_ROTATE:-0}" = 1 ]; then   # the DDR3-direct rotation client (sys/tango_video_rotate_ddr3.v, README "Rotation")
-    [ "$DDR3" = 1 ] || { echo "build_core.sh: TANGO_VIDEO_ROTATE=1 needs TANGO_VIDEO_DDR3=1 (the rotation writes through tango_ddr3's C0 port, README \"Rotation\")"; exit 2; }
+    [ "$DDR3" = 1 ] || { echo "build_core.sh: TANGO_VIDEO_ROTATE=1 needs TANGO_VIDEO_DDR3=1 (the rotation client writes its frames through tango_ddr3's C0 port)"; exit 2; }
     printf '`define TANGO_VIDEO_ROTATE\n`define TANGO_DDRAM\n' >> "$DEFS"
 fi
 VPROC=0; AFILT=0
@@ -253,7 +255,7 @@ if [ $DDR3 = 1 ]; then
     [ "$(grep -c '^set_clock_groups' "$SDC")" = 1 ] || { echo "build_core.sh: TANGO_VIDEO_DDR3: want one set_clock_groups line"; exit 2; }
 fi
 # TANGO_EXTRA_CST=<file>: a core's placement constraints (INS_LOC lines; never GROUP -- the Gowin GROUP memory bomb),
-# appended to the board cst (e.g. a region for a core's bus-data latches)
+# appended to the board cst (experiment: the Genesis DDR3 DBG build's bus-data latch region)
 if [ -n "${TANGO_EXTRA_CST:-}" ]; then
     [ -f "$TANGO_EXTRA_CST" ] || { echo "build_core.sh: TANGO_EXTRA_CST=$TANGO_EXTRA_CST: no such file"; exit 2; }
     # INS_LOC lines, comments and blank lines only: GROUP / GRP_LOC (the memory bomb) and anything else (an IO_LOC

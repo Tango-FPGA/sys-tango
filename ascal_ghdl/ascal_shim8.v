@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 the Tango authors
 // ascal_shim8 -- `module ascal` (FRAC 8) for Verilator AND Gowin builds: the REAL TEMLIB ascal.vhd with the Tango
 // patch ascal_poly_bram.patch, as the GHDL netlist of ascal_fixed8.vhd (ascal_fixed8.v, made by gen.sh 8), behind the parameter
 // and port names sys/ascal_wrap.v uses, so ascal_wrap.v compiles unmodified.  Gowin's VHDL front

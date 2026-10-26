@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 """fs2bin.py -- convert a Gowin .fs (ASCII bitstream) into the raw .bin that BL616 loaders stream over JTAG.
 
 Packs the '0'/'1' bit lines MSB-first. Verified: A2600Nano v2.5 a2600nano_console138k.fs converts

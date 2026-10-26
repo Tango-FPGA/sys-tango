@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # run_tb_vsync_ddr3.sh [delay ...] -- ascal at a native rate (build-time raster totals): sim/tb_ascal_ddr3.v (the
 # REAL ascal netlist, tango_ddr3 on the calibrated IP model) with TB_VSYNC_CORE (sim/tb_vsync_core.v: a progressive
 # source of exactly LINES x 4719 clk_pix a frame -- the TG16's frame at the exact clock) and the raster at HT x VT

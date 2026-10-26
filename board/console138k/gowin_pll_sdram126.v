@@ -1,3 +1,7 @@
+// Gowin IP generator output: the PLL instance and its defparams follow the Gowin IDE's PLL generator output for
+// GW5AST-138 (as pll_c27_mod.v), which carries "Copyright (C)2014-2025 Gowin Semiconductor Corporation. All rights
+// reserved."  Not under sys-tango's MIT licence; see NOTICE ("Gowin IP templates").  The settings and comments are
+// the Tango authors'.
 // Gowin_PLL_SDRAM126 -- PLL config for the menu SDRAM domain at 126 MHz.
 // GW5AST-LV138PG484AC1/I0 uses the "PLL" primitive (not PLLA).
 // 27 MHz in, IDIV 1 (PFD 27), MDIV 28 (VCO 756, legal 700-1400), ODIV0 6 ->

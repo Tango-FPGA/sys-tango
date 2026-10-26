@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # run_tb_ascal_ext.sh [nframes] -- TANGO_ASCAL_EXT + TANGO_VIDEO_F1 through the REAL ascal (sim/tb_ascal_ext.v: tango_sys
 # + the sim-only core sim/tb_ascal_ext_core.v), then sim/check_ascal_ext.py on the frames.
 # Run from the sys-tango checkout (or a core's sys/): sim/run_tb_ascal_ext.sh.  OBJ=<dir> (default sim/obj_ascal_ext).

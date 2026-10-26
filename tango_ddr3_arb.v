@@ -150,8 +150,8 @@ module tango_ddr3_arb #(
         assign hc_pop[g] = gc && (csel == g);
     end endgenerate
     // ---- the IP stage: the granted command, registered beside the arbiter -- both candidates every clock and which
-    // one was granted (registers), so no grant decision selects the 317 bits (timing: an earlier Template core DDR3
-    // build failed by 0.49 ns on tags_ok -> the grant -> ao_d) ...
+    // one was granted (registers), so no grant decision selects the 317 bits (timing: a Template DDR3 build
+    // failed by 0.49 ns on tags_ok -> the grant -> ao_d) ...
     reg          ao_v = 1'b0, ao_w = 1'b0, ao_c = 1'b0, ao_f = 1'b0;   // granted; a write; the core's; the fence
     reg  [28:0]  aov_a = 29'd0, aoc_a = 29'd0;
     reg  [255:0] aov_d = 256'd0, aoc_d = 256'd0;
@@ -193,24 +193,23 @@ module tango_ddr3_arb #(
         if (ien3[8]) begin iq_c[3] <= {ao_w, ao_a}; iq_w[3] <= ao_w; end
     end
     // ---- the head register: the IP's command, address, write data and mask come straight from registers (timing: irp
-    // -> the 4:1 entry select -> the IP's wr_buf_din failed or nearly failed with every placement: +0.85 ns in a
-    // Template core build, +1.88 in a Genesis core build, +0.061 in a Genesis debug build).  The head is loaded from
-    // entry irp (a registered pointer: the select ends at these registers, placed by the queue) when the queue has an
-    // entry and the head is empty or firing; its load enable is copied per lane (below).  The IP then sees only
-    // register outputs.
+    // -> the 4:1 entry select -> the IP's wr_buf_din failed or nearly failed with every placement: +0.85 ns in one build,
+    // +1.88 in a Genesis core build, +0.061 in a Genesis debug build).  The head is loaded from entry irp (a registered
+    // pointer: the select ends at these registers, placed by the queue) when the queue has an entry and the head is
+    // empty or firing; its load enable is copied per lane (below).  The IP then sees only register outputs.
     // A command reaches the IP a clock later than before (grant -> ao -> entry -> head); the credits (cr, IQ = 4)
     // cover the three stages, so back-to-back commands still issue one a clock.
     // The load enable's copies (timing: a wide enable comes from registers, one copy per lane): syn_keep on the hload
     // WIRES did not keep them -- GowinSynthesis merged the nine identical LUTs into one net (hload_0_s1, fanout ~325).
-    // TG16 core builds failed clk_x1 on that one net's route, -0.151 ns to a far lane's hd_d CE and -0.081 ns through
-    // m_nn to m_ne (a 4.1 ns hop), while another placement of the same netlist had the same path at +1.3 ns: its two
-    // load groups pull the one LUT opposite ways -- the 256-bit hd_d / hd_m lane enables along the IP's data rows,
-    // and the queue's counter and pointers.  So every copy now reads its own REGISTERS: m_ne,
+    // TG16 core builds failed clk_x1 on that one net's route, -0.151 ns to a far lane's hd_d CE and -0.081 ns
+    // through m_nn to m_ne (a 4.1 ns hop), while another placement of the same netlist had the same path
+    // at +1.3 ns: its two load groups pull the one LUT opposite ways -- the 256-bit hd_d / hd_m lane enables along
+    // the IP's data rows, and the queue's counter and pointers.  So every copy now reads its own REGISTERS: m_ne,
     // hd_vl and hd_wl hold m_n != 0, hd_v and hd_w once per lane (syn_preserve, which this synthesizer does honour
     // on registers: ien0..3 above, tango_ddr3_vport's b_push / lo_have), each lane's copies are updated through that
     // lane's own enable, and no two lanes share a LUT input, so nothing is left to merge.  Lanes: 0..7 the data lanes
     // (hd_d / hd_m, 36 enables each), 8 the command lane (hd_a, hd_w, hd_v: what the IP's command side reads), 9 the
-    // control lane (irp, m_n: the queue side -- an earlier version gave hd_a and the pointers one
+    // control lane (irp, m_n: the queue side -- a first draft of this change gave hd_a and the pointers one
     // lane, and its worst remaining hload path was exactly that lane's, hload_8 -> hd_a with a 3.7 ns hop).  Every
     // copy equals its original every clock (same reset, same update, equal inputs by induction: checked below in
     // simulation); hd_v and hd_w themselves still drive fire and the IP, combinational on cmd_ready / wr_data_rdy
@@ -283,8 +282,8 @@ module tango_ddr3_arb #(
     // ---- bookkeeping
     wire          g_read = grant && !g_write;
     // What the grant selects among is computed from registers (timing: gc ended in the carry
-    // chain of inflight + gc -- four LUT levels after the grant on the longest clk_x1 path, -0.534 ns in an earlier
-    // launcher build).  Each candidate is a net of its own (syn_keep, the comment form, as tango_ddr3_fifo.v: without
+    // chain of inflight + gc -- four LUT levels after the grant on the longest clk_x1 path, -0.534 ns in a launcher
+    // build).  Each candidate is a net of its own (syn_keep, the comment form, as tango_ddr3_fifo.v: without
     // it synthesis folds the late bit back into the adder); the grant only selects.
     wire [7:0]    pend_p1 /* synthesis syn_keep = 1 */ = pend + 8'd1;
     wire [7:0]    ret_n  = gc ? pend_p1 : pend;
@@ -299,8 +298,8 @@ module tango_ddr3_arb #(
     reg           tag_we = 1'b0, fwd_q = 1'b0;
     wire [TAG_LOG2-1:0] tr_n = tr[TAG_LOG2-1:0] + (rd_data_valid ? 1'b1 : 1'b0);
     wire [PW+7:0] tag_h = fwd_q ? fwd_d : tag_rd;
-    // the core commands a return retires, counted a clock after the return (registered: timing; an earlier Template
-    // core DDR3 build failed by 0.88 ns on the IP's rd_data_valid -> inflight): core_room is conservative by a clock
+    // the core commands a return retires, counted a clock after the return (registered: timing; a Template DDR3
+    // build failed by 0.88 ns on the IP's rd_data_valid -> inflight): core_room is conservative by a clock
     reg           rdv_q = 1'b0;
     reg  [7:0]    ret_q = 8'd0;
     wire [15:0]   inflight_r /* synthesis syn_keep = 1 */ = inflight - (rdv_q ? {8'd0, ret_q} : 16'd0);   // after the last clock's return

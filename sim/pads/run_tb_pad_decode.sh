@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 the Tango authors
 # run_tb_pad_decode.sh -- unit bench of tango_pad_decode.v: replays sim/pads/pad_vectors.txt, which the firmware's (menu-tango's)
 # bl616/tango/test/pd_vectors.c writes from its C reference decode, plus hand-written scenarios.  Prints "PAD_DECODE PASS".
 # Small (one module, ~20 s to build; memory-capped by build_tools/tango_capped.sh).  Run from the sys-tango checkout (or a core's sys/).

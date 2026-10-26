@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 the Tango authors
 // ascal_shim_ddr3 -- FRAC 4: the TANGO_VIDEO_DDR3 variant of ascal_shim.v (Avalon N_DW 128, N_AW 28, RAMBASE 0x2000_0000:
 // the DDR3 scaler port), around the GHDL netlist ascal_fixed_ddr3.v (gen.sh 4d).
 // Everything else is ascal_shim.v's; its header follows.

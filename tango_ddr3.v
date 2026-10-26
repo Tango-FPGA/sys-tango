@@ -71,7 +71,7 @@ module tango_ddr3 #(
     wire [255:0] r_data;
     wire [7:0]   wq_max, cq_max;
     wire [31:0]  nwb, nrb;
-    // a registered copy of rst per block, placed beside it (timing: an earlier Template core DDR3 build failed by
+    // a registered copy of rst per block, placed beside it (timing: a Template DDR3 build failed by
     // 0.93 ns on the framework's reset register -> the video port across the die); all three a clock late together
     (* syn_preserve = 1 *) reg rst_v = 1'b1;
     (* syn_preserve = 1 *) reg rst_c = 1'b1;

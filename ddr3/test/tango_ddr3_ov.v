@@ -12,7 +12,7 @@
 // Timing (clk_pix 74.25 MHz): no arithmetic on cx.  The horizontal positions come from counters that run along the
 // scanline (hdmi.sv: cx + 1 every clock, 1649 -> 0), loaded when the next pixel reaches a region's left edge; the
 // vertical ones are registered from cy (it changes at cx = 0, and nothing is drawn left of x = 24).  The picture is
-// the one an earlier version with arithmetic on cx drew, pixel for pixel (checked in sim over whole frames).
+// the one the earlier arithmetic version drew, pixel for pixel (checked in sim over whole frames).
 // Latency: 3 clk_pix from cx to rgb (the bank read is the second); the drawing is for cx + 3, so blocks sit where
 // the numbers say (hdmi.sv's own rgb register aside, which the decoder's offset search absorbs).
 //==============================================================================

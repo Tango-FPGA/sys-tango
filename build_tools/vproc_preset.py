@@ -1,10 +1,22 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-only
 # Copyright (c) 2026 the Tango authors
+#
+# This file is derived from MiSTer's Main_MiSTer (https://github.com/MiSTer-devel/Main_MiSTer, compared at commit
+# c3dc8ed): audio.cpp (setFilter: the audio filter file reader) and video.cpp (the scaler filter, gamma and shadow-mask
+# file readers, the default nearest-neighbour filter, the preset reader) and file_io.cpp (FileReadLine), whose parsing
+# it follows step by step with their names (read_video_filter, scale_phases, N_PHASES, SM_FLAG_*, ...).  audio.cpp,
+# video.cpp and file_io.cpp carry no copyright or licence header of their own; Main_MiSTer's LICENSE file is the
+# text of the GNU General Public License version 3, and none of them says "or any later version".  This file is under
+# that version, the GNU General Public License version 3 (GPL-3.0-only; LICENSES/GPL-3.0.txt), not under the MIT
+# licence of the rest of sys-tango; see NOTICE.
+# This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 """vproc_preset.py -- MiSTer's video/audio processing files -> the Tango link transfers that load them
-(README "Video and audio processing").  Our own code, written from Main_MiSTer's behaviour (master, read in October
-2026; line numbers below are video.cpp / audio.cpp / file_io.cpp there).  The same parsing the BL616 firmware does in C
-(menu-tango bl616/tango/tango_vproc.c); the host tests compare the two byte for byte.
+(README "Video and audio processing"), from Main_MiSTer (line numbers below are video.cpp / audio.cpp / file_io.cpp
+of an earlier Main_MiSTer master; at c3dc8ed some have moved, e.g. read_video_filter starts at video.cpp 411).
+The same parsing the BL616 firmware does in C (menu-tango bl616/tango/tango_vproc.c); the host tests compare the two
+byte for byte.
 
 Uses:
   * a build-time preset (TANGO_VPROC_PRESET, JTAG tests): --vh writes tango_vproc_preset.vh, a logic ROM of the
@@ -291,7 +303,7 @@ def read_afilter(path, vol=0):
                 line += 1
     return out, vals
 
-AF_DEFAULTS = dict(rate=7056000, cx=4258969, cx0=3, cx1=3, cx2=1,       # sys_top.v 339-346
+AF_DEFAULTS = dict(rate=7056000, cx=4258969, cx0=3, cx1=3, cx2=1,       # Template_MiSTer sys_top.v 386-397
                    cy0=(-6216759) & 0xFFFFFF, cy1=6143386, cy2=(-2023767) & 0xFFFFFF)
 
 # ---------------------------------------------------------------- presets (video.cpp 1010-1125)

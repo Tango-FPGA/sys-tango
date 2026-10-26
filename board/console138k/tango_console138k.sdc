@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 the Tango authors
 // tango_sys_top138 (every Console 138K core): clk, clk27, clk_ser, clk_pix, clk_audio + clk48 for the USB hosts
 // (pll_c48).  Clock domains are asynchronous groups; every crossing is by construction:
 //   SPI: SCK is a clock; byte handover SCK -> clk_pix by toggle (3 flops) + held data; reply byte

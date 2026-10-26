@@ -2,7 +2,7 @@
 // Copyright (c) 2026 the Tango authors
 // tango_core_ports.vh -- the port list every Tango core's top module (module tango_core) has,
 // as MiSTer cores `include "sys/emu_ports.vh"`.  Use:  module tango_core ( `include "tango_core_ports.vh" );
-// Meanings: README "The core interface" (and menu-tango docs/MAKING-A-CORE.md "The core-facing interface").
+// Meanings: README "The core interface".
 `include "tango_cfg.vh"
 `include "tango_video_opts.vh"      // the Video options' CONF_STR entries: `TANGO_VIDEO_CONF / `TANGO_VIDEO_CONF_P(...)
 // ---- clocks and reset
