@@ -7,8 +7,9 @@
 #   TANGO_CORE_FILES  the core's HDL files (absolute paths, space separated); one defines module tango_core
 #   TANGO_SDC         the SDC to use (board SDC, or the board SDC + the core's clocks)
 #   TANGO_DBG         1 = debug build (link-debug blocks on screen; top tango_sys_top138_dbg)
+#   TANGO_PLL_INIT    Gowin's pll_init.v (module PLL_INIT) in the user's Gowin installation (build_core.sh: GOWIN_HOME)
 # Device and options: GW5AST-LV138PG484AC1/I0, device version B, IOB registers, plus
-# -use_jtag_as_gpio 1 for the BL616 link on the JTAG balls, as the A2600Nano Console 138K build.
+# -use_jtag_as_gpio 1 for the BL616 link on the JTAG balls (UG290-2.7.6E Table 4-2; tango_console138k.cst).
 set root $env(TANGO_ROOT)
 set sys  $root/sys
 set brd  $sys/board/console138k
@@ -16,7 +17,7 @@ set dbg  [expr {[info exists env(TANGO_DBG)] && $env(TANGO_DBG) == "1"}]
 create_project -name $env(TANGO_NAME) -dir $env(TANGO_OUT_ABS) -pn GW5AST-LV138PG484AC1/I0 -device_version B -force
 add_file $env(TANGO_DEFS)          ;# the build's `defines (TANGO_SDRAM), first: build_core.sh
 foreach f [list \
-    $brd/pll_init.v $brd/pll_c27_mod.v $brd/pll_c27.v $brd/pll_c1485_mod.v $brd/pll_c1485.v \
+    $env(TANGO_PLL_INIT) $brd/pll_c27_mod.v $brd/pll_c27.v $brd/pll_c1485_mod.v $brd/pll_c1485.v \
     $brd/pll_c48_mod.v $brd/pll_c48.v $brd/tango_tmds_ser.v $brd/tango_sys_top138.v \
     $sys/usb/usb_ls_detect.v $sys/usb/usb_fs_phy.v $sys/usb/usb_fs_host.v \
     $sys/tango_beam_lead.v $sys/tango_menu_overlay.v $sys/tango_link.v $sys/tango_link_dbg_view.v \

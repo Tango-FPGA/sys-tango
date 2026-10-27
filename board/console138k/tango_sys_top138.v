@@ -12,10 +12,9 @@
 //   and f, tango_cfg.vh -- the audio accumulator, the ACR's N / CTS and the SDC follow)
 //   clk 50 (V22) --pll_c48--> clk48 (USB hosts)
 //   pixel reset: async assert on !lock, sync release 8 clk_pix later
-// BL616 link pins (A2600Nano Console 138K a2600_top.cst;
-// Gowin GW5AST-138B PBGA484A pin file):
+// BL616 link pins (tango_console138k.cst; Sipeed's Console 138K schematic; Gowin GW5AST-138B PBGA484A pin file):
 //   spi_csn T13 (TMS)  spi_sck V12 (TCK)  spi_mosi R13 (TDI)  spi_miso U13 (TDO)  spi_irqn U15
-//   bl616_jtagsel V14 (BL616 GPIO28)      jtagseln: the A2600Nano arrangement (below)
+//   bl616_jtagsel V14 (BL616 GPIO28)      jtagseln: JTAGSEL_N from logic ("JTAG hand-back", below)
 // The four JTAG balls are dual-purpose: the build sets -use_jtag_as_gpio 1.
 //==============================================================================
 `include "tango_cfg.vh"
@@ -33,7 +32,7 @@ module tango_sys_top138 #(
     inout  wire        spi_miso,       // output; read back through its input buffer for debug
     output wire        spi_irqn,
     input  wire        bl616_jtagsel,
-    output wire        jtagseln,       // A2600Nano's arrangement, see "JTAG hand-back" 
+    output wire        jtagseln,       // JTAGSEL_N from logic, see "JTAG hand-back"
     // USB-A host ports
     inout  wire        usb1_dp, usb1_dn,     // USB-A1 M15 / M16
     inout  wire        usb2_dp, usb2_dn      // USB-A2 H13 / G13
@@ -72,13 +71,14 @@ module tango_sys_top138 #(
     output wire        SDRAM_nCS, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nWE
 `endif
 );
-    // ---- JTAG hand-back -- EXACTLY the A2600Nano Console 138K arrangement (GPL-3.0; NOTICE), which runs on this board
-    // with our firmware (on silicon): a top-level port jtagseln = NOT bl616_jtagsel
-    // (a2600_top.vhd 321) with NET_LOC "jtagseln" V_JTAGSELN + PULL_MODE=DOWN (a2600_top.cst 6-7).
-    // The PnR does not honour V_JTAGSELN on a port: it places the port on an ordinary IO (A2600: T16);
-    // we pin it to T16 too, so the netlist + pins match the proven core.  Driving JTAGSEL_N itself from
-    // an internal net (earlier builds) left the MISO pad (TDO/U13) not following the fabric
-    // on silicon (debug row 12), although UG290-2.7.6E Table 4-2 says JTAGSEL_N = 1 -> JTAG pins GPIO.
+    // ---- JTAG hand-back: the BL616 takes the JTAG balls back to reprogram a running core.  JTAGSEL_N selects what the
+    // four JTAG balls are when they are set as GPIO (-use_jtag_as_gpio 1): 0 = configuration (JTAG), 1 = user I/O
+    // (UG290-2.7.6E Table 4-2, Table 7-3); SUG1018-1.6E 2.10.2 (JTAGSEL_N Net Constraints) gives a net of the design
+    // control of it, NET_LOC "<net>" V_JTAGSELN.  Here that net is the top-level port jtagseln = NOT bl616_jtagsel:
+    // the BL616 drives V14 high to program (JTAGSEL_N low), low to run the link; tango_console138k.cst has the
+    // constraints (NET_LOC ... V_JTAGSELN, PULL_MODE=DOWN, and IO_LOC T16, because place and route also puts the port
+    // on a user I/O).  Driving JTAGSEL_N from an internal net instead left the MISO pad (TDO/U13) not following the
+    // fabric on silicon, although Table 4-2 says JTAGSEL_N = 1 makes the JTAG balls GPIO.
     assign jtagseln = ~bl616_jtagsel;
     wire jtagsel_n = ~bl616_jtagsel;
     reg jtagsel_n_q /* synthesis syn_preserve = 1 */;
@@ -189,7 +189,7 @@ module tango_sys_top138 #(
 `endif
 
     // ---- SCK as a clock: an internal net, so the cst can put it on a global clock (CLOCK_LOC does
-    // not take an input port, CT1020; A2600Nano's a2600_top.cst line 1 names an internal net too)
+    // not take an input port, CT1020)
     wire spi_sck_clk /* synthesis syn_keep = 1 */;
     assign spi_sck_clk = spi_sck;
 

@@ -9,8 +9,14 @@
 # Run from anywhere; memory-capped (build_tools/tango_capped.sh).  Never loads the board.
 # TANGO_OUT: the build directory (default ddr3/test/out; one per concurrent build).  TANGO_PNR_OPTS: extra Gowin
 # options, "name=value ..." (e.g. "replicate_resources=1 place_option=2"), recorded in the archive's name and .txt.
+# GOWIN_HOME: the Gowin EDA installation (the directory that holds IDE/; default ~/gowin): gw_sh, the DDR3 IP and
+# PLL_INIT (IDE/ipcore/PLL_ADV/data/PLL/pll_init.v), as board/console138k/build_core.sh.
 set -eu
 cd "$(dirname "$0")/../.."
+GOWIN_HOME="${GOWIN_HOME:-$HOME/gowin}"
+PLL_INIT_V="$GOWIN_HOME/IDE/ipcore/PLL_ADV/data/PLL/pll_init.v"
+[ -x "$GOWIN_HOME/IDE/bin/gw_sh" ] || { echo "build_ddr3_test: no Gowin IDE at GOWIN_HOME=$GOWIN_HOME (set GOWIN_HOME to the directory that holds IDE/)"; exit 2; }
+[ -f "$PLL_INIT_V" ] || { echo "build_ddr3_test: $PLL_INIT_V not found (the Gowin IDE's PLL_INIT)"; exit 2; }
 SYS="$(pwd)"
 NAME=tango_ddr3_test138
 OUT="${TANGO_OUT:-$SYS/ddr3/test/out}"
@@ -18,7 +24,7 @@ rm -rf "$OUT"; mkdir -p "$OUT"
 BRD=$SYS/board/console138k
 FILES="$SYS/ddr3/test/tango_ddr3_test_top.v $SYS/ddr3/test/tango_ddr3_test_core.v $SYS/ddr3/test/tango_ddr3_tester.v
        $SYS/ddr3/test/tango_ddr3_rmw.v $SYS/ddr3/test/tango_ddr3_ov.v $SYS/ddr3/test/tango_ddr3_uart.v
-       $BRD/pll_init.v $BRD/pll_c27_mod.v $BRD/pll_c27.v $BRD/pll_c1485_mod.v $BRD/pll_c1485.v
+       $PLL_INIT_V $BRD/pll_c27_mod.v $BRD/pll_c27.v $BRD/pll_c1485_mod.v $BRD/pll_c1485.v
        $BRD/pll_ddr3_mod.v $BRD/pll_ddr3.v $BRD/tango_tmds_ser.v $(ls $SYS/hdmi/*.sv)"
 {
     echo "create_project -name $NAME -dir $OUT -pn GW5AST-LV138PG484AC1/I0 -device_version B -force"
@@ -37,8 +43,8 @@ CAPPED=$SYS/build_tools/tango_capped.sh
 export TANGO_MEM_CAP=${TANGO_MEM_CAP:-8G}
 echo "build_ddr3_test: gw_sh $(date +%T) -> $OUT/build.log"
 set +e
-LD_LIBRARY_PATH="$HOME/gowin/IDE/lib" QT_QPA_PLATFORM=minimal LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6 \
-    timeout 3600 nice -n 10 "$CAPPED" "$HOME/gowin/IDE/bin/gw_sh" "$OUT/build.tcl" > "$OUT/build.log" 2>&1
+LD_LIBRARY_PATH="$GOWIN_HOME/IDE/lib" QT_QPA_PLATFORM=minimal LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6 \
+    timeout 3600 nice -n 10 "$CAPPED" "$GOWIN_HOME/IDE/bin/gw_sh" "$OUT/build.tcl" > "$OUT/build.log" 2>&1
 RC=$?
 set -e
 PNR=$OUT/$NAME/impl/pnr

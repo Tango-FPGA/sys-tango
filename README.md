@@ -1,6 +1,6 @@
 # sys-tango -- the Tango framework
 
-**Version 2026-10-26** (date code `20261026`)
+**Version 2026-10-27** (date code `20261027`)
 
 sys-tango is the framework every Tango core is built on: a MiSTer-style `sys/` for the
 **Sipeed Tang Console 138K**. A core mounts this repository as a git submodule at `sys/` and keeps its own code beside
@@ -9,11 +9,11 @@ BL616 microcontroller and its on-screen menu, the USB controller ports, the vide
 SDRAM or DDR3, MiSTer's video and audio processing, and the build scripts that turn a core into a bitstream.
 
 The framework has no bitstream of its own. It is built into every core, and each core's release carries that core's
-bitstreams (`.bin`). sys-tango is MIT-licensed except five files derived from MiSTer, which are under the GNU GPL, and
-the BL616 link constraint lines, which come from a GPL-3.0 project: see [Licence](#licence). A bitstream built with the
-GPL files is a work under the GPL. The BL616 firmware is released separately in
-[firmware-tango](https://github.com/Tango-FPGA/firmware-tango), and the launcher that loads cores from the SD card in
-[menu-tango](https://github.com/Tango-FPGA/menu-tango).
+bitstreams (`.bin`). sys-tango is MIT-licensed except five files derived from MiSTer, which are under the GNU GPL: see
+[Licence](#licence). A bitstream built with the GPL files is a work under the GPL. Nothing of Gowin's is in this
+repository: a build takes `PLL_INIT` (and, in DDR3 builds, the DDR3 IP) from the user's Gowin EDA installation. The
+BL616 firmware is released separately in [firmware-tango](https://github.com/Tango-FPGA/firmware-tango), and the launcher
+that loads cores from the SD card in [menu-tango](https://github.com/Tango-FPGA/menu-tango).
 
 ## Contents
 
@@ -39,7 +39,7 @@ GPL files is a work under the GPL. The BL616 firmware is released separately in
 ## Features
 
 - **Board top for the Tang Console 138K** (`board/console138k/tango_sys_top138.v`): PLLs (with Gowin's `PLL_INIT`,
-  which the GW5AST needs to lock), **HDMI 1280x720p60** with 48 kHz 16-bit stereo audio, the BL616 link pins and the
+  which the GW5AST needs to lock, taken from the Gowin installation at build time), **HDMI 1280x720p60** with 48 kHz 16-bit stereo audio, the BL616 link pins and the
   JTAG hand-back (the BL616 can still take the JTAG pins back to load the next core), the two USB-A host ports, and
   in DDR3 builds the board's DDR3 with the Gowin DDR3 Memory Interface IP.
 - **BL616 link** (`tango_link.v`): the SPI link to the BL616 in the FPGA Companion wire format (targets SYS 0, HID 1,
@@ -147,7 +147,7 @@ A `CONF_STR` may be up to 4095 bytes (12-bit `conf_addr`).
 
 | Signal | Dir | Clock | Meaning |
 |---|---|---|---|
-| `CLK_50M` | in | | the board oscillator, for the core's own PLLs (wrap each GW5AST PLL with `PLL_INIT`, as `board/console138k/pll_*.v`) |
+| `CLK_50M` | in | | the board oscillator, for the core's own PLLs (wrap each GW5AST PLL with `PLL_INIT`, as `board/console138k/pll_*.v`; every build already adds `PLL_INIT`, so a core does not add another copy) |
 | `CLK_PIX` | in | | 74.25 MHz, the 720p pixel clock (or a `TANGO_HDMI_PLL` preset's) |
 | `RESET` | in | | high while the pixel PLL is not locked |
 | `CLK_SYS` | out | | the core's system clock; every MiSTer-style signal below is in it (it may be `CLK_PIX`) |
@@ -477,9 +477,18 @@ the board), or logic or block RAM use over 98%.
 You need, on Linux (x86-64):
 
 - **Gowin EDA** (the IDE with `gw_sh`), V1.9.11.03, with a licence that covers the GW5AST-138 (and, for
-  `TANGO_VIDEO_DDR3`, its DDR3 Memory Interface IP). `build_core.sh` runs it headless from `~/gowin/IDE` (edit the two
-  `gowin/IDE` paths in the script for another location), with `QT_QPA_PLATFORM=minimal` and the system's
-  `libfreetype` preloaded (`gw_sh` crashes with its bundled one on some distributions; the path is Debian/Ubuntu's).
+  `TANGO_VIDEO_DDR3`, its DDR3 Memory Interface IP). `GOWIN_HOME` is the installation directory, the one that holds
+  `IDE/` (default `~/gowin`). `build_core.sh` runs `IDE/bin/gw_sh` from it headless, with `QT_QPA_PLATFORM=minimal`
+  and the system's `libfreetype` preloaded (`gw_sh` crashes with its bundled one on some distributions; the path is
+  Debian/Ubuntu's). From the same installation the build takes two things this repository does not ship (they stay
+  under the installation's licence: `NOTICE`):
+  - **`PLL_INIT`**, `IDE/ipcore/PLL_ADV/data/PLL/pll_init.v`: the start-up calibration every PLL of the Console 138K's
+    GW5AST-138 needs to lock. Every build adds it (the framework's PLL wrappers instantiate it, and a core's own PLL
+    may too). `build_core.sh` prints the sha256 of the file it uses; the V1.9.11.03 one begins `3ef05a1b`.
+    `sim/run_tb_retune.sh` and `ddr3/test/build_ddr3_test.sh` take it from the same place.
+  - **The DDR3 Memory Interface IP** (`TANGO_VIDEO_DDR3` builds), generated into each build by `ddr3/tango_ddr3_ip.tcl`.
+
+  If `GOWIN_HOME` has no `IDE/bin/gw_sh` or no `pll_init.v`, the scripts stop with an error that names the path.
 - **Python 3** for the build tools.
 - **GHDL 4** (with `--synth`; 4.1.0 made the shipped netlists) only to regenerate the ascal netlists
   (`ascal_ghdl/gen.sh`), which also needs **Verilator 5** for its lint and GNU `patch`.
@@ -551,15 +560,12 @@ Third-party files, with their terms as the files state them (see `NOTICE`):
 | `tango_video_geo.v` | Template_MiSTer `sys/video_freak.sv` (`video_freak`, `video_scale_int`), `sys/sys_top.v` lines 856-944 | "Copyright (c) 2020 Grabulosaure, (c) 2021 Alexey Melnikov"; "Copyright (c) 2021 Alexey Melnikov"; "(c)2017-2020 Alexey Melnikov" | `GPL-2.0-or-later` (video_freak.sv: "GPL Licensed", no version, so GPLv2 section 9; sys_top.v: version 2 or later) |
 | `build_tools/vproc_preset.py` | Main_MiSTer `audio.cpp`, `video.cpp`, `file_io.cpp` | none in the files | `GPL-3.0-only` (no headers; Main_MiSTer's LICENSE is the GPL version 3) |
 
-**Lines from a GPL-3.0 project** (the files' SPDX line is `MIT AND GPL-3.0-only`):
-
-| Lines | From | Licence |
-|---|---|---|
-| the BL616 link constraints in `board/console138k/tango_console138k.cst` and `tango_console138k_dbg.cst` | [MiSTle-Dev/A2600Nano](https://github.com/MiSTle-Dev/A2600Nano) `src/tang/console138k/a2600_top.cst` (the `jtagseln` lines verbatim; pins, pulls and drives) | GPL-3.0-only |
-
-**The SDRAM pin locations** in `board/console138k/tango_console138k_sdram.cst` (MIT) are those of Sipeed's Tang
-Console 138K schematic, `Tang_Mega_138K_Console_32001C__Schematics.pdf` (Rev 1.3, the `SDRAM0_*` nets; from
+**The SDRAM pin locations** in `board/console138k/tango_console138k_sdram.cst` and **the BL616 link pin locations** in
+`tango_console138k.cst` / `tango_console138k_dbg.cst` (all MIT) are those of Sipeed's Tang Console 138K schematic,
+`Tang_Mega_138K_Console_32001C__Schematics.pdf` (Rev 1.3: the `SDRAM0_*` nets; the `JTAG.*` and `FPGA_UART.*` nets; from
 [dl.sipeed.com](https://dl.sipeed.com/shareURL/TANG/Console/02_Schematic); the document states no licence or terms).
+The link block's pulls, drives and `jtagseln` constraints are the Tango authors' settings, each with its reason (and
+Gowin's documentation) cited in the file.
 
 **Other third-party files:**
 
@@ -567,8 +573,12 @@ Console 138K schematic, `Tang_Mega_138K_Console_32001C__Schematics.pdf` (Rev 1.3
 |---|---|---|---|
 | **ascal**, the "Avalon scaler" | `ascal.vhd` (byte-identical to `sys/ascal.vhd` of MiSTer-devel/Genesis_MiSTer at commit `adc0c42`); the GHDL netlists `ascal_ghdl/ascal_fixed*.v` (machine translations); `ascal_ghdl/ascal_poly_bram.patch` (our modification, applied to a copy) | TEMLIB (2018-2020), as carried and extended by the MiSTer project | ascal.vhd's own terms: "freely distributed and used for any purpose"; bugs and enhancements to info@temlib.org |
 | **hdmi** | `hdmi/*.sv` (modified copies, see `hdmi/README.md`); `sim/hdmi_acr_sim.sv` (a simulation-only copy of one of them) | Sameer Puri, [hdl-util/hdmi](https://github.com/hdl-util/hdmi) | MIT (`hdmi/LICENSE-MIT`), offered by upstream as MIT or Apache-2.0 |
-| **Gowin IP** | `board/console138k/pll_c27_mod.v`, `pll_c1485_mod.v`, `pll_c48_mod.v`, `pll_ddr3_mod.v` and their wrappers `pll_c27.v`, `pll_c1485.v`, `pll_c48.v`, `pll_ddr3.v`, `gowin_pll_sdram*.v` (Gowin IP generator output; the modified ones say so in their headers), `usb/tang_pll_48.v`; `board/console138k/pll_init.v` (Gowin's `PLL_INIT`, from the IDE, unchanged) | Gowin Semiconductor Corporation | Gowin's copyright notice ("Copyright (C)2014-2025 Gowin Semiconductor Corporation. All rights reserved.") |
+| **Gowin `PLL_INIT`** | not in this repository: `IDE/ipcore/PLL_ADV/data/PLL/pll_init.v` of the user's Gowin EDA installation, added to every build by `build_core.sh` (see [Building](#building)) | Gowin Semiconductor Corporation | the licence of the user's Gowin EDA |
 | **Gowin DDR3 Memory Interface IP** | not in this repository: generated into each `TANGO_VIDEO_DDR3` build by `ddr3/tango_ddr3_ip.tcl` | Gowin Semiconductor Corporation | the licence of the user's Gowin EDA |
+
+The PLL modules (`board/console138k/pll_c27.v`, `pll_c27_mod.v`, `pll_c48.v`, `pll_c48_mod.v`, `pll_c1485.v`,
+`pll_c1485_mod.v`, `pll_ddr3.v`, `pll_ddr3_mod.v`, `gowin_pll_sdram.v`) are the Tango authors' (MIT): each instantiates
+Gowin's PLL primitive with its settings, each parameter commented from Gowin's UG306 (Arora V Clock User Guide).
 
 **Behaviour read and reimplemented** (the files above aside):
 
@@ -585,11 +595,13 @@ Console 138K schematic, `Tang_Mega_138K_Console_32001C__Schematics.pdf` (Rev 1.3
 - **FPGA Companion** ([MiSTle-Dev/FPGA-Companion](https://github.com/MiSTle-Dev/FPGA-Companion), Apache-2.0): the
   SPI wire format of the BL616 link (targets, commands, replies), implemented from the way the Companion firmware
   uses it (`tango_link.v`); the Xbox 360-class pads' start-up reads (`usb/usb_fs_host.v`).
-- **A2600Nano** ([MiSTle-Dev/A2600Nano](https://github.com/MiSTle-Dev/A2600Nano), GPL-3.0): its Console 138K build
-  showed how the BL616 link and the JTAG hand-back work on this board: the link's constraint lines are its own (above,
-  GPL-3.0), `tango_sys_top138.v` uses its JTAG hand-back arrangement (`jtagseln` = NOT `bl616_jtagsel`), and the SD
-  STATUS reply in `tango_link.v` follows the byte layout of its `sd_card.v`. Its HDL was otherwise read for behaviour
-  only.
+- **A2600Nano** ([MiSTle-Dev/A2600Nano](https://github.com/MiSTle-Dev/A2600Nano), GPL-3.0), an earlier reference
+  only: its Console 138K build was the first to run the BL616 link and the JTAG hand-back on this board. The BL616 link
+  block of `tango_console138k.cst` / `_dbg.cst` was first taken from it; it is now the Tango authors' own text (MIT,
+  above), with the same values (the ones proven on silicon) and their sources in Sipeed's schematic and Gowin's
+  documentation. The JTAG hand-back in `tango_sys_top138.v` (`jtagseln` = NOT `bl616_jtagsel`, with `NET_LOC`
+  `V_JTAGSELN`) was first seen there; the file cites Gowin's documentation for it. The SD STATUS reply in `tango_link.v`
+  follows the byte layout of its `sd_card.v`. Its HDL was otherwise read for behaviour only.
 - **nestang** ([nand2mario/nestang](https://github.com/nand2mario/nestang), GPL-3.0): its Console 138K constraints
   were the earlier reference for the SDRAM module's ball map (now taken from Sipeed's schematic, above); ports A/B take
   requests the way NES cores of nestang and MiSTer do.
@@ -615,7 +627,8 @@ Console 138K schematic, `Tang_Mega_138K_Console_32001C__Schematics.pdf` (Rev 1.3
   decoder's commands and the upload commands are its own.
 - **From hdl-util (vendored, modified):** the HDMI encoder, thinned to 720p and pipelined for timing, with the raster
   totals and the audio clock regeneration values as parameters.
-- **From Gowin:** the PLL modules and `PLL_INIT`; the DDR3 Memory Interface IP, generated at build time.
+- **From Gowin (not shipped):** `PLL_INIT` and the DDR3 Memory Interface IP, both taken from the user's Gowin
+  installation at build time. The PLL modules are written from Gowin's documentation of the PLL primitive (UG306).
 
 ## Licence
 
@@ -624,9 +637,10 @@ MIT (`LICENSE`): Copyright (c) 2026 the Tango authors, **except**:
 - the five files derived from MiSTer (see [Attributions](#attributions)): `tango_audio_filter.v`,
   `build_tools/iir_model.py`, `tango_shmask.v` and `tango_video_geo.v` (GPL-2.0-or-later),
   `build_tools/vproc_preset.py` (GPL-3.0-only);
-- the BL616 link constraint lines from A2600Nano (GPL-3.0-only) in `tango_console138k.cst` and
-  `tango_console138k_dbg.cst`;
-- the third-party files listed in `NOTICE`, under their own terms (TEMLIB ascal, hdl-util's HDMI encoder, Gowin IP).
+- the third-party files listed in `NOTICE`, under their own terms (TEMLIB ascal, hdl-util's HDMI encoder).
+
+Nothing of Gowin's is in this repository: `PLL_INIT` and the DDR3 IP come from the user's Gowin installation at build
+time and stay under its licence (`NOTICE`, [Building](#building)).
 
 Each source file's SPDX line says which licence applies; `NOTICE` lists the few files without one (generated or
 hash-locked files, the third-party files) and the MiSTer data in otherwise-MIT files. The GPL texts are in `LICENSES/`
@@ -636,6 +650,6 @@ hash-locked files, the third-party files) and the MiSTer data in otherwise-MIT f
 of the core. `tango_video_geo.v` is in every build with a video path (`TANGO_VIDEO_FB` or `TANGO_VIDEO_ASCAL`), so in
 practice in every core; `tango_audio_filter.v` is in every `TANGO_AUDIO_FILTER` build and `tango_shmask.v` in every
 `TANGO_VIDEO_PROC` build. The HDL files from MiSTer are all GPL-2.0-or-later: with an MIT or GPL-2.0-or-later core the
-bitstream is under GPL-2.0-or-later, with a GPL-3.0 core under GPL-3.0. The GPL-3.0-only BL616 constraint lines and the
-Gowin IP generator output keep their own terms (`NOTICE`). `vproc_preset.py` and `iir_model.py` are host tools and are
+bitstream is under GPL-2.0-or-later, with a GPL-3.0 core under GPL-3.0. `PLL_INIT` and the DDR3 IP, which a build takes
+from the user's Gowin installation, keep Gowin's terms (`NOTICE`). `vproc_preset.py` and `iir_model.py` are host tools and are
 not part of a bitstream; a `TANGO_VPROC_PRESET` build contains `vproc_preset.py`'s generated output, not its code.

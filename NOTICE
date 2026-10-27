@@ -70,8 +70,8 @@ another GPL-2.0-or-later-compatible licence under GPL-2.0-or-later, and with a G
 build_tools/vproc_preset.py (GPL-3.0-only) and build_tools/iir_model.py are host tools and are not part of any
 bitstream; a TANGO_VPROC_PRESET build contains vproc_preset.py's generated output (tango_vproc_preset.vh, the
 transfers made from MiSTer's filter files), not its code.  The other parts of a build keep their own terms:
-the GPL-3.0-only BL616 link lines of the board constraints (A2600Nano, below), TEMLIB's ascal and the Gowin IP
-generator output (below; Gowin's own terms, and in TANGO_VIDEO_DDR3 builds the Gowin DDR3 IP).
+TEMLIB's ascal (below), and what the build takes from the user's Gowin EDA installation under that installation's
+licence: PLL_INIT (pll_init.v) in every build and the Gowin DDR3 IP in TANGO_VIDEO_DDR3 builds (below).
 
 MiSTer data in files that are otherwise MIT
 --------------------------------------------
@@ -96,25 +96,28 @@ Source: Tang_Mega_138K_Console_32001C__Schematics.pdf ("Tang_138K_Console_V32001
 Used:   board/console138k/tango_console138k_sdram.cst: the 38 SDRAM ball locations are the SDRAM0_* nets of sheets
         SOM_BTB1 (p5), FPGA_EXT_CONN (p8) and SOM_BTB0 (p4: SDRAM0_~{CS} = F21), DQML / DQMH = DM0 / DM1; LVCMOS33
         because VCCIO2 is the 3.3 V rail (sheet POWER_TREE, p2).  The file is the Tango authors' (MIT).
-        The BL616 link balls of tango_console138k.cst also match this schematic (JTAG.TMS T13, JTAG.TCK V12,
-        JTAG.TDI R13, JTAG.TDO U13 = BL616 GPIO_0..3; FPGA_UART.TX U15 -> BL616_IO27_RX; FPGA_UART.RX V14 <-
-        BL616_IO28_TX; sheets SOM_BTB0, SOM_BTB2 and USB_JTAG), but those lines' pulls, drives and the jtagseln / spi_sck
-        clock constraints are still A2600Nano's (below).
+        board/console138k/tango_console138k.cst and tango_console138k_dbg.cst, the BL616 link block: the ball
+        locations (JTAG.TMS T13, JTAG.TCK V12, JTAG.TDI R13, JTAG.TDO U13 = BL616 GPIO_0..3; FPGA_UART.TX U15 ->
+        BL616_IO27_RX; FPGA_UART.RX V14 <- BL616_IO28_TX; sheets SOM_BTB0, SOM_BTB2 and USB_JTAG), LVCMOS33 / BANK_VCCIO
+        3.3 because VCCIO10 and VCCIO5 are on the 3.3 V rail (sheet POWER_TREE), and the board's resistors that the pull
+        settings take into account (R72 / R73 on JTAG.TDO, sheet USB_JTAG).  The pulls, drives, the jtagseln constraints
+        (NET_LOC V_JTAGSELN, Gowin SUG1018-1.6E 2.10.2; IO_LOC T16) and the spi_sck_clk global clock are the Tango
+        authors' settings, each with its reason in the file.  Both files are the Tango authors' (MIT).
 
 
-A2600Nano (MiSTle-Dev) -- GNU GPL version 3
---------------------------------------------
-Source: https://github.com/MiSTle-Dev/A2600Nano, compared at commit fbc50ec46b75e86e79df7e8846025a616446abd5.
-        Its LICENSE file is the text of the GNU General Public License version 3.
-Lines:  board/console138k/tango_console138k.cst and tango_console138k_dbg.cst, the "BL616 link" block (the
-        jtagseln, bl616_jtagsel, spi_csn, spi_sck, spi_mosi, spi_miso and spi_irqn constraints and the spi_sck
-        CLOCK_LOC): from src/tang/console138k/a2600_top.cst lines 1 and 6-21 (the two jtagseln lines verbatim;
-        the pins, pulls and drives with the ports renamed).  a2600_top.cst has no licence header; these lines
-        are GPL-3.0-only, and the two files say so in their SPDX line (MIT AND GPL-3.0-only).
-Also:   board/console138k/tango_sys_top138.v: the JTAG hand-back arrangement (a top-level port
-        jtagseln = NOT bl616_jtagsel, with the constraints above) is A2600Nano's (a2600_top.vhd line 321);
-        tango_link.v: the SD STATUS reply follows the byte layout of A2600Nano's src/misc/sd_card.v.  Both files
-        are the Tango authors' code (MIT).
+A2600Nano (MiSTle-Dev) -- earlier reference only
+------------------------------------------------
+https://github.com/MiSTle-Dev/A2600Nano (GPL-3.0), commit fbc50ec46b75e86e79df7e8846025a616446abd5.  The BL616 link
+block of tango_console138k.cst / _dbg.cst was first taken from its src/tang/console138k/a2600_top.cst (lines 1 and
+6-21), the first core to run the BL616 link and JTAG hand-back on this board.  The block is now the Tango authors' own
+text (MIT, above under Sipeed): its values are unchanged, because they are the ones proven on silicon, and their
+sources are Sipeed's schematic and Gowin's documentation, cited in the file.  Its comments and layout are new; the
+statements are Gowin's constraint syntax, and four port names (jtagseln, bl616_jtagsel, spi_csn, spi_irqn) are the
+same as A2600Nano's.
+Also:   board/console138k/tango_sys_top138.v: the JTAG hand-back (a top-level port jtagseln = NOT bl616_jtagsel, NET_LOC
+        V_JTAGSELN) was first seen in A2600Nano (a2600_top.vhd line 321); the file cites Gowin's JTAGSEL_N documentation
+        (UG290-2.7.6E Tables 4-2 and 7-3, SUG1018-1.6E 2.10.2) for it.  tango_link.v: the SD STATUS reply follows the
+        byte layout of A2600Nano's src/misc/sd_card.v.  Both files are the Tango authors' code (MIT).
 
 
 nestang (nand2mario) -- earlier reference only
@@ -172,24 +175,22 @@ Source: github.com/hdl-util/hdmi by Sameer Puri, MIT / Apache-2.0, used under MI
         modified copies (each modified file's header says what changed; hdmi/README.md lists the changes).
 
 
-Gowin IP templates
-------------------
-Files:  board/console138k/pll_c27_mod.v, pll_c1485_mod.v, pll_c48_mod.v, pll_ddr3_mod.v, usb/tang_pll_48.v
-            (PLL modules written by the Gowin IP generator; their headers carry Gowin's copyright notice)
-        board/console138k/pll_c27.v, pll_c1485.v, pll_c48.v, pll_ddr3.v
-            (the PLL wrappers the same generator writes beside each *_mod.v: the module with its *_MOD and
-            PLL_INIT instances and PLL_INIT's defparams; reformatted)
-        board/console138k/gowin_pll_sdram.v, gowin_pll_sdram126.v, gowin_pll_sdram162.v
-            (PLL instances with the generator's port list and defparams; the settings are the Tango authors')
-Source: Gowin Semiconductor Corporation.  The generator's output carries "Copyright (C)2014-2025 Gowin
-        Semiconductor Corporation. All rights reserved."  pll_c1485_mod.v / pll_c1485.v (dividers as
-        parameters, dynamic MDIV), pll_c48_mod.v, pll_ddr3_mod.v / pll_ddr3.v (other settings, a gated CLKOUT2)
-        are modified by the Tango authors; each file's header says what changed.
-
-Files:  board/console138k/pll_init.v
-Source: Gowin Semiconductor Corporation: the PLL_INIT module of the Gowin EDA IDE (ipcore/PLL_ADV/data/PLL/pll_init.v
-        of version V1.9.11.03), copied unchanged; the GW5AST PLLs need it to lock.
-
-Gowin DDR3 Memory Interface IP (TANGO_VIDEO_DDR3 builds)
-Not in this repository: ddr3/tango_ddr3_ip.tcl has the Gowin IDE generate the IP into each build, under the
-licence of the user's Gowin EDA installation.  Its configuration follows Sipeed's DDR3 example for the board.
+Gowin Semiconductor -- taken from the user's Gowin EDA installation, not in this repository
+-----------------------------------------------------------------------------------------
+Nothing of Gowin's is in this repository.  A build takes these from the Gowin EDA IDE it runs on (GOWIN_HOME, default
+~/gowin: board/console138k/build_core.sh, ddr3/test/build_ddr3_test.sh, sim/run_tb_retune.sh; README "Building"),
+under the licence of that installation:
+  - PLL_INIT: IDE/ipcore/PLL_ADV/data/PLL/pll_init.v (module PLL_INIT; the framework is built and tested with the
+    V1.9.11.03 file, sha256 3ef05a1ba92157d73e3c54ed9d589645508a4ae332d8bcf133a0457cc3e866c8).  Every build adds it:
+    every GW5AST PLL needs it to lock, and the framework's PLL wrappers (and some cores' own PLLs) instantiate it.
+    sim/run_tb_retune.sh compiles it from the same place.
+  - The Gowin DDR3 Memory Interface IP (TANGO_VIDEO_DDR3 builds): ddr3/tango_ddr3_ip.tcl has the IDE generate it
+    into each build.  Its configuration follows Sipeed's DDR3 example for the board.
+  - The device primitives (PLL, PLLA, OSER10, DCE, ...) are the toolchain's; their names, parameters and ports are
+    Gowin's, documented in Gowin's user guides (the PLLs: UG306, Arora V Clock User Guide).
+The PLL modules board/console138k/pll_c27.v, pll_c27_mod.v, pll_c48.v, pll_c48_mod.v, pll_c1485.v, pll_c1485_mod.v,
+pll_ddr3.v, pll_ddr3_mod.v and gowin_pll_sdram.v are
+the Tango authors' (MIT): each instantiates the PLL primitive with its settings, and each parameter is
+commented from UG306.  They replace earlier files that were Gowin IP generator output, with the same module names,
+ports, instance names and parameter values (the post-place-and-route netlists and bitstreams of old and new are
+identical).

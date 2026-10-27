@@ -1,11 +1,6 @@
-// SPDX-License-Identifier: MIT AND GPL-3.0-only
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 the Tango authors
-// The BL616 link block below (from "BL616 link" to the spi_irqn lines) is taken from A2600Nano
-// (https://github.com/MiSTle-Dev/A2600Nano, compared at commit fbc50ec), src/tang/console138k/a2600_top.cst lines 1
-// and 6-21: the jtagseln lines verbatim, and the pins, pulls and drives of the link ports (renamed).  a2600_top.cst
-// carries no licence header of its own; A2600Nano's LICENSE file is the text of the GNU General Public License
-// version 3, and neither says "or any later version": those lines are GPL-3.0-only.  The rest of this file is the
-// Tango authors' (MIT).  See NOTICE.
+// The constraint statements are Gowin's syntax (SUG1018 Arora V Design Physical Constraints User Guide).
 // tango_sys_top138_dbg (the debug build of any Console 138K Tango core): = tango_console138k.cst with the
 // internal nets under the wrapper instance u/.
 // clk + HDMI (silicon-proven).
@@ -19,31 +14,56 @@ IO_LOC "tmds_d_n[1]" H15; IO_PORT "tmds_d_n[1]" PULL_MODE=NONE IO_TYPE=LVCMOS33D
 IO_LOC "tmds_d_p[2]" K17; IO_PORT "tmds_d_p[2]" PULL_MODE=NONE IO_TYPE=LVCMOS33D;
 IO_LOC "tmds_d_n[2]" J17; IO_PORT "tmds_d_n[2]" PULL_MODE=NONE IO_TYPE=LVCMOS33D;
 
-// BL616 link: pins, pulls and drives copied from the MiSTle A2600Nano Console 138K
-// constraints (MiSTle-Dev/A2600Nano src/tang/console138k/a2600_top.cst,
-// lines 6-21; our port names: spi_sclk -> spi_sck, spi_dat -> spi_mosi, spi_dir -> spi_miso).
-// T13/V12/R13/U13 are the JTAG balls TMS/TCK/TDI/TDO (GW5AST-138B PBGA484A.json CFG field):
-// the build sets -use_jtag_as_gpio 1.
-// A2600Nano's lines verbatim (a2600_top.cst 6-7); PnR places the port on an ordinary IO, which we
-// fix to T16 = where A2600's build put it (its pnr report), so the pins match the proven core.
-NET_LOC "jtagseln" V_JTAGSELN;
-IO_PORT "jtagseln" PULL_MODE=DOWN IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
-IO_LOC "jtagseln" T16;
-IO_LOC "bl616_jtagsel" V14;   // BL616 GPIO28 (former UART), FPGA input
-IO_PORT "bl616_jtagsel" PULL_MODE=UP IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
-IO_LOC "spi_csn" T13;         // TMS / BL616 GPIO0
-IO_PORT "spi_csn" PULL_MODE=UP IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
-// SCK is the link's bit clock (tango_link SCK domain) on a global clock, as A2600Nano's
-// a2600_top.cst line 1 (CLOCK_LOC "spi_io_clk" BUFG = CLK).
+// ---- BL616 link ---------------------------------------------------------------------------------------------------
+// Ball locations: Sipeed's Tang Console 138K schematic (Tang_Mega_138K_Console_32001C, Rev 1.3; NOTICE) and Gowin's
+// GW5AST-138B PBGA484A pin file.
+// The SPI link to the BL616 uses the FPGA's four JTAG balls (bank 10; CFG TMS / TCK / TDI / TDO in the PBGA484A pin
+// file), which the BL616 also drives as JTAG when it programs the FPGA, and two bank-5 balls on the BL616's UART pins.
+// The JTAG balls are user I/O after configuration because the build sets -use_jtag_as_gpio 1 (UG290-2.7.6E Table 4-2,
+// JTAG PORT "Set as GPIO").  Schematic nets: SOM_BTB0 (JTAG.*), SOM_BTB2 (FPGA_UART.*, LCD.INT2), USB_JTAG (BL616 side).
+// IO_TYPE LVCMOS33, BANK_VCCIO 3.3: VCCIO10 and VCCIO5 are on the 3.3 V rail (sheet POWER_TREE).
+// Inputs: a pull only where the line can be left undriven (BL616 in reset or booting) and must then read a defined
+// level, and none against a resistor on the board.
+//
+// spi_csn: T13 = JTAG.TMS = BL616 GPIO_0, input, the link's select (active low).  Pull-up: undriven, the link is
+// deselected.
+IO_LOC  "spi_csn" T13;
+IO_PORT "spi_csn" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
+// spi_sck: V12 = JTAG.TCK = BL616 GPIO_1, input, the link's bit clock.  No pull: Gowin requires a 4.7 kOhm pull-down on
+// TCK on the PCB (UG290-2.7.6E Table 7-3 note 2; on the SOM, not on the Console schematic).  DRIVE=OFF: input only.
+IO_LOC  "spi_sck" V12;
+IO_PORT "spi_sck" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=OFF BANK_VCCIO=3.3;
+// The SCK domain (tango_link) is clocked by u/spi_sck_clk, an internal net equal to spi_sck (CLOCK_LOC names a net, not a
+// port: tango_sys_top138.v), put on a global clock line (SUG1018 CLOCK_LOC, BUFG = CLK) so that every flop of the domain
+// gets the edge through the low-skew clock tree rather than general routing.
 CLOCK_LOC "u/spi_sck_clk" BUFG = CLK;
-IO_LOC "spi_sck" V12;         // TCK / BL616 GPIO1, 4K7 pull-down on the module
-IO_PORT "spi_sck" PULL_MODE=NONE DRIVE=OFF IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
-IO_LOC "spi_mosi" R13;        // TDI / BL616 GPIO3
-IO_PORT "spi_mosi" PULL_MODE=NONE DRIVE=OFF IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
-IO_LOC "spi_miso" U13;        // TDO / BL616 GPIO2, 3K3 pull-down on the board
-IO_PORT "spi_miso" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
-IO_LOC "spi_irqn" U15;        // BL616 GPIO27 (former UART)
-IO_PORT "spi_irqn" PULL_MODE=NONE DRIVE=8 IO_TYPE=LVCMOS33 BANK_VCCIO=3.3;
+// spi_mosi: R13 = JTAG.TDI = BL616 GPIO_3, input.  No pull: the BL616 drives it whenever the link runs (when it does
+// not, spi_csn's pull-up keeps the link deselected).  DRIVE=OFF: input only.
+IO_LOC  "spi_mosi" R13;
+IO_PORT "spi_mosi" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=OFF BANK_VCCIO=3.3;
+// spi_miso: U13 = JTAG.TDO = BL616 GPIO_2, driven by the FPGA (an inout only so that the pad can be read back for debug).
+// No pull: the board pulls the net down with 3.3 kOhm (R73 0 Ohm to BL616_BOOT, R72 3.3 kOhm to ground; sheet USB_JTAG),
+// which an internal pull-up would fight.  DRIVE=8 mA: far above the 1 mA that pull-down draws at 3.3 V.
+IO_LOC  "spi_miso" U13;
+IO_PORT "spi_miso" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// spi_irqn: U15 = FPGA_UART.TX -> BL616_IO27_RX (R76 3 Ohm), output, the link's interrupt (active low).  No pull: the FPGA
+// always drives it.  DRIVE=8 mA, as spi_miso.
+IO_LOC  "spi_irqn" U15;
+IO_PORT "spi_irqn" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// bl616_jtagsel: V14 = FPGA_UART.RX <- BL616_IO28_TX (R75 3 Ohm), input.  The BL616 sets it high to take the JTAG balls
+// back for programming (jtagseln below).  Pull-up: while the BL616 does not drive it, it reads high and the JTAG balls
+// stay available for programming.
+IO_LOC  "bl616_jtagsel" V14;
+IO_PORT "bl616_jtagsel" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
+// jtagseln = NOT bl616_jtagsel (tango_sys_top138.v): the JTAGSEL_N function driven from logic.  NET_LOC ... V_JTAGSELN
+// (SUG1018-1.6E 2.10.2, JTAGSEL_N Net Constraints) gives a net control of JTAGSEL_N; JTAGSEL_N low returns the JTAG
+// balls to configuration (UG290-2.7.6E Table 4-2), so a running core can be reprogrammed without a power cycle.
+// The PBGA484A package has no JTAGSEL_N ball.  Place and route also puts the port on a user I/O; IO_LOC fixes that at
+// T16 (IOB76A, bank 5: the SOM connector's LCD.INT2 net, sheet SOM_BTB2) so that every build has the same pins.
+// PULL_MODE=DOWN: the low (asserting) level whenever the output is not driven.
+NET_LOC "jtagseln" V_JTAGSELN;
+IO_PORT "jtagseln" IO_TYPE=LVCMOS33 PULL_MODE=DOWN BANK_VCCIO=3.3;
+IO_LOC  "jtagseln" T16;
 
 // USB-A host ports (Sipeed Tang_Mega_138K_Console_32001C schematic, "2 x USB-A": FPGA_USB1_P/N = M15/M16,
 // FPGA_USB2_P/N = H13/G13, bank 3, 15k pull-downs on the board, VBUS always on).
