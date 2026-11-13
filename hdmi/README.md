@@ -46,6 +46,3 @@ default and no option defined, the module is exactly the thinned copy above.
    toggles on clk_pix). 0 (the default) = N and CTS computed from AUDIO_RATE / VIDEO_RATE as before (6144 / 74250).
 5. **The CTS at run time** (`TANGO_HDMI_RETUNE`, input `acr_cts_rt`, "TANG PATCH 3"): when the pixel clock is retuned
    at core start, the CTS follows the PLL (N stays 12288); it changes only while the module is held in reset.
-
-`sim/hdmi_acr_sim.sv` is a simulation-only copy of `audio_clock_regeneration_packet.sv` with its real-valued constants
-worked out (Verilator cannot fold them); it takes the same N / CTS pair.

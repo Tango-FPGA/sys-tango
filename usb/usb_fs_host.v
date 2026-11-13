@@ -58,8 +58,9 @@ module usb_fs_host (
     output reg        rpt_tog,
     output reg  [7:0] bad_crc,     // corrupted reports REJECTED -- was the phantom source
     // device identity (GET_DESCRIPTOR DEVICE, bytes 8-11 = idVendor, idProduct little-endian).
-    // Set during enumeration, before the first report; 0000 if the fetch failed (then the pad
-    // still enumerates and reports).  Stable from before the first rpt_tog flip until re-enumeration.
+    // Set during enumeration, before the first report.  A device descriptor read that fails is retried
+    // with a fresh bus reset and enumeration (REENUM_MAX times); only then is the identity 0000 and the
+    // pad still enumerates and reports.  Stable from before the first rpt_tog flip until re-enumeration.
     output reg [15:0] dev_vid,
     output reg [15:0] dev_pid,
     // what the device is (GET_DESCRIPTOR CONFIGURATION: the first interface's class/subclass/protocol,
@@ -88,7 +89,7 @@ module usb_fs_host (
     // ---------------------------------------------------------------- PIDs
     localparam [7:0] PID_SOF=8'hA5, PID_SETUP=8'h2D, PID_IN=8'h69,
                      PID_OUT=8'hE1, PID_DATA0=8'hC3, PID_DATA1=8'h4B,
-                     PID_ACK=8'hD2;
+                     PID_ACK=8'hD2, PID_STALL=8'h1E;
 
     // ------------------------------------------------------------- CRC fns
     function [4:0] crc5_11(input [10:0] d);  // 11 bits LSB-first
@@ -263,7 +264,7 @@ module usb_fs_host (
     // Xbox 360 class (interface FF/5D/01) start-up reads, pc22-24: six control reads, each SETUP / data IN (discarded) / status
     // OUT, in the order of FPGA Companion's usbh_xbox_client_thread (bl616/companion/src/bl616/mcu_hw.c 635-698, whose xpad quirk packets
     // QUIRK_360_START_PKT_1..3 these are): string 2 (2 and 32 bytes), class IN interface 0100/0x20, class IN interface 0000/8, class IN
-    // device 0000/4, vendor IN interface 0100/20.  A read that fails (STALL, no answer) is given up after DESC_TRIES and the next one runs.
+    // device 0000/4, vendor IN interface 0100/20.  A read that fails is given up (a STALL at once, no answer after its stage budget) and the next one runs.
     reg        is_xin;               // the first interface is class FF subclass 5D protocol 01
     reg [2:0]  qi;
     reg [5:0]  ep_miss;
@@ -358,7 +359,8 @@ module usb_fs_host (
     //       brings all 18 at once; an 8-byte ep0 needs two packets) -> we ACK
     //  pc10: status OUT (addr1 ep0) + DATA1 length 0 -> ACK   (the host may end a control read's
     //       data stage early: USB 2.0 8.5.3)
-    //  then pc2.  More than DESC_TRIES tries in pc8-10 (STALL, no answer): VID = PID = 0, go on to pc2.
+    //  then pc2.  A stage of pc8-10 out of tries (see the budgets below) or STALLed: a new bus reset and
+    //  enumeration, REENUM_MAX times; after that VID = PID = 0 and on to pc2.
     localparam [7:0] REQ_SETADDR [0:7] = '{8'h00,8'h05,8'h01,8'h00,8'h00,8'h00,8'h00,8'h00};
     localparam [7:0] REQ_SETCFG  [0:7] = '{8'h00,8'h09,8'h01,8'h00,8'h00,8'h00,8'h00,8'h00};
     localparam [7:0] REQ_GETDEV  [0:7] = '{8'h80,8'h06,8'h00,8'h01,8'h00,8'h00,8'h12,8'h00};
@@ -370,10 +372,37 @@ module usb_fs_host (
     //  script with them: pc0 SET_ADDRESS, pc1 status IN, pc8 GET_DESCRIPTOR(DEVICE), pc9 data IN (until
     //  bytes 8-11), pc10 status OUT, pc11 GET_DESCRIPTOR(CONFIGURATION), pc12 data IN (until bytes 14-16),
     //  pc13 status OUT, pc2 SET_CONFIGURATION, pc3 status IN, [keyboard: pc14 SET_PROTOCOL, pc15 status IN],
-    //  pc4 poll.  More than DESC_TRIES tries in pc8-13: VID/PID 0000, kind by speed, on to pc2; in pc14-15:
-    //  on to pc4.
-    localparam [7:0] DESC_TRIES = 8'd40;
-    reg [7:0]  desc_tries;
+    //  pc4 poll.  A stage out of tries or STALLed in pc8-10: re-enumeration (above), then VID/PID 0000;
+    //  in pc11-13: the identity is kept, kind by speed, on to pc2; in pc14-15: on to pc4.
+    //
+    // Per-stage try budgets.  One transaction is attempted per 1 ms frame (SOF or low-speed keep-alive
+    // first), so N tries span at least N ms.  The count restarts whenever the script moves to another
+    // stage (tries_pc) and on every accepted descriptor data packet.  USB 2.0 9.2.6.4: a device may take
+    // up to 500 ms to return the first data packet of a standard request and 500 ms for each following
+    // one, and 50 ms to complete the status stage after the last data packet; a device may not NAK or
+    // STALL a SETUP (8.4.6.4), so that budget only covers lost packets.  A STALL handshake ends the stage
+    // at once (a protocol stall persists until the next SETUP, so retrying the same token cannot succeed).
+    localparam [9:0] DESC_TRIES_DATA = 10'd500;   // data IN stages: pc9, 12, 17, 20, 23
+    localparam [9:0] DESC_TRIES_CTL  = 10'd50;    // SETUP and status stages: pc8, 10, 11, 13-16, 18, 19, 21, 22, 24
+    localparam [9:0] DESC_TRIES_OUT  = 10'h3FF;   // set to end a stage now (a STALL, a configuration read that keeps failing its CRC)
+    reg [9:0]  desc_tries;
+    reg [4:0]  tries_pc;             // the stage desc_tries counts (0: none; every budgeted stage is pc8 or later)
+    wire       stage_data = (script_pc == 5'd9) || (script_pc == 5'd12) || (script_pc == 5'd17) || (script_pc == 5'd20) || (script_pc == 5'd23);
+    wire [9:0] tries_now  = (script_pc == tries_pc) ? desc_tries : 10'd0;
+    wire [9:0] tries_max  = stage_data ? DESC_TRIES_DATA : DESC_TRIES_CTL;
+    // a bad-CRC packet in the full configuration read restarts that read at its SETUP (pc17 -> pc16, below); the
+    // restarts are counted so that a link that corrupts every attempt still ends the phase
+    localparam [2:0] CFG_RESTARTS = 3'd7;
+    reg [2:0]  cfg_rs;
+    // USB 2.0 9.2.6.3: after the status stage of SET_ADDRESS the device has a 2 ms recovery interval before it
+    // must accept a SETUP at the new address.  The status ACK goes out inside frame N; frames N+1 and N+2 are
+    // skipped, so the next SETUP (frame N+3) starts more than 2 ms after it.
+    reg [1:0]  adr_wait;
+    // re-enumerations after a failed device descriptor read (a slow device that never answered, or a STALL):
+    // kept across S_WAIT_DEV, cleared when a device descriptor read completes (its status stage ACKed: a device that
+    // answers the data stage but fails the status stage still uses the re-enumerations up), by the fallback and by a detach
+    localparam [1:0] REENUM_MAX = 2'd3;
+    reg [1:0]  reenum;
 
     // interrupt-IN endpoint scan: a poll that TIMES OUT means "no such
     // endpoint" -> try the next; NAK or DATA identifies the live endpoint.
@@ -422,7 +451,8 @@ module usb_fs_host (
             st<=S_WAIT_DEV; bus_reset<=0; pkt_go<=0; ms_ctr<=0; frame_no<=0;
             script_pc<=0; desc_valid<=0; ever_valid<=0; rpt_tog<=1'b0; bad_crc<=8'd0; to_count<=0; st_clear_rx<=0; sof_due<=0;
             poll_ep<=4'd1; ep_locked<=0; fail_streak<=0;
-            dev_vid<=16'd0; dev_pid<=16'd0; desc_tries<=8'd0; ka_go<=0; ls<=0; dev_kind<=2'd0;
+            dev_vid<=16'd0; dev_pid<=16'd0; desc_tries<=10'd0; tries_pc<=5'd0; ka_go<=0; ls<=0; dev_kind<=2'd0;
+            cfg_rs<=3'd0; adr_wait<=2'd0; reenum<=2'd0;
             cap_kind<=3'd0; cap_off<=7'd0;
             rpt16<=128'd0; rpt_len<=8'd0; rpt2_tog<=1'b0; rpt2_valid<=1'b0; dev_ver<=16'd0; desc_rdy<=1'b0;
             len_cfg<=9'd0; len_rpt<=11'd0; len_dev<=8'd0; desc_trunc<=2'b00; doff<=11'd0; exp_pid<=PID_DATA1; rq_wlen<=16'd0; rq_widx<=8'd0;
@@ -437,7 +467,9 @@ module usb_fs_host (
             case (st)
             S_WAIT_DEV: begin
                 bus_reset <= 0;
-                dev_vid <= 16'd0; dev_pid <= 16'd0; desc_tries <= 8'd0; dev_kind <= 2'd0;
+                dev_vid <= 16'd0; dev_pid <= 16'd0; desc_tries <= 10'd0; tries_pc <= 5'd0; dev_kind <= 2'd0;
+                cfg_rs <= 3'd0; adr_wait <= 2'd0;
+                if (!dev_present) reenum <= 2'd0;                 // detached: the next device starts with every re-enumeration
                 cap_kind <= 3'd0; cap_off <= 7'd0;
                 desc_rdy <= 1'b0; len_cfg <= 9'd0; len_rpt <= 11'd0; len_dev <= 8'd0; desc_trunc <= 2'b00; dev_ver <= 16'd0;
                 ep_from_cfg <= 1'b0; ep_miss <= 6'd0; t_clr <= 1'b1; walk_rst <= 1'b1; is_xin <= 1'b0; qi <= 3'd0;
@@ -486,23 +518,37 @@ module usb_fs_host (
             S_SCRIPT: begin
                 ae = tok_ae(script_pc);
                 c5 = crc5_11(ae);
-                // descriptor / protocol phase out of tries: give up (VID/PID 0000, kind by speed), go on
-                if (script_pc >= 4'd8 && desc_tries >= DESC_TRIES) begin
+                // SET_ADDRESS recovery interval: this frame carries only its SOF / keep-alive
+                if (adr_wait != 2'd0) begin
+                    adr_wait <= adr_wait - 2'd1;
+                    st <= S_SOF_IDLE;
+                end else
+                // descriptor / protocol stage out of tries (or STALLed): give up, go on
+                if (script_pc >= 4'd8 && tries_now >= tries_max) begin
+                    desc_tries <= 10'd0; tries_pc <= 5'd0; cap_kind <= 3'd0;
+                    st <= S_SOF_IDLE;
                     if (script_pc >= 5'd22) begin                       // an Xbox start-up read that failed: the next one
                         if (qi == 3'd5) script_pc <= 5'd4; else begin qi <= qi + 3'd1; script_pc <= 5'd22; end
                     end
                     else if (is_xin && script_pc >= 5'd16) begin script_pc <= 5'd22; qi <= 3'd0; end   // the configuration phase failed: the start-up reads still run
                     else if (script_pc >= 4'd14) script_pc <= 4'd4;
+                    else if (script_pc < 5'd11 && reenum != REENUM_MAX) begin
+                        // the device descriptor read failed: no device is run without its identity while re-enumerations
+                        // are left -- detach-free restart through S_WAIT_DEV (the device is still present: attach delay, bus
+                        // reset, SET_ADDRESS again), with the reconnect watchdog's clean-up
+                        reenum <= reenum + 2'd1;
+                        st <= S_WAIT_DEV; script_pc <= 5'd0;
+                        poll_ep <= 4'd1; ep_locked <= 1'b0; ep_from_cfg <= 1'b0;
+                        desc_valid <= 1'b0; fail_streak <= 11'd0; rpt2_valid <= 1'b0;
+                    end
                     else begin
                         script_pc <= 4'd2; dev_kind <= ls ? 2'd2 : 2'd0;
-                        // a failed configuration probe (pc11-13) keeps the identity the device descriptor already gave (seen in the bench's stall=2 run);
-                        // only a failed device descriptor read clears VID / PID / bcdDevice
-                        if (script_pc < 5'd11) begin dev_vid <= 16'd0; dev_pid <= 16'd0; dev_ver <= 16'd0; t_clr <= 1'b1; len_dev <= 8'd0; end
+                        // a failed configuration probe (pc11-13) keeps the identity the device descriptor already gave (a device that STALLs the configuration request);
+                        // only a failed device descriptor read (re-enumerations used up) clears VID / PID / bcdDevice: the pad still runs
+                        if (script_pc < 5'd11) begin dev_vid <= 16'd0; dev_pid <= 16'd0; dev_ver <= 16'd0; t_clr <= 1'b1; len_dev <= 8'd0; reenum <= 2'd0; end
                     end
-                    desc_tries <= 8'd0; cap_kind <= 3'd0;
-                    st <= S_SOF_IDLE;
                 end else begin
-                if (script_pc >= 4'd8) desc_tries <= desc_tries + 8'd1;
+                if (script_pc >= 4'd8) begin desc_tries <= tries_now + 10'd1; tries_pc <= script_pc; end
                 case (script_pc)
                 5'd10, 5'd13, 5'd18, 5'd21, 5'd24: begin     // status stage of GET_DESCRIPTOR: OUT token, then DATA1 len 0
                     pkt[0] <= PID_OUT;
@@ -559,7 +605,7 @@ module usb_fs_host (
             end
             S_GOT_ACK: begin
                 if (rxb[0] == PID_ACK) case (script_pc)
-                    5'd10:   begin script_pc <= 5'd11; cap_off <= 7'd0; end   // device descriptor done
+                    5'd10:   begin script_pc <= 5'd11; cap_off <= 7'd0; reenum <= 2'd0; end   // device descriptor done (status stage included)
                     5'd13:   script_pc <= 5'd2;                               // configuration descriptor done
                     5'd8:    begin script_pc <= 5'd9; cap_off <= 7'd0; end
                     5'd11:   begin script_pc <= 5'd12; cap_off <= 7'd0; end
@@ -604,6 +650,8 @@ module usb_fs_host (
                 // report exists -- and cannot reach a running game.
                 if (!ever_valid)
                     desc_bytes <= {rxb[6],rxb[5],rxb[4],rxb[3],rxb[2],rxb[1],rxb[0],{4'd0,rx_cnt}};
+                // a STALLed request in the descriptor phase: this stage ends at the next frame (the give-up path)
+                if (rxb[0] == PID_STALL && script_pc >= 5'd8) begin desc_tries <= DESC_TRIES_OUT; tries_pc <= script_pc; end
                 st <= S_SOF_IDLE;
             end
             S_GOT_DATA: begin
@@ -639,6 +687,7 @@ module usb_fs_host (
                         else begin
                             exp_pid <= (rxb[0] == PID_DATA1) ? PID_DATA0 : PID_DATA1;
                             cap_off <= cap_off + (rx_n - 7'd3);
+                            desc_tries <= 10'd0;                     // 9.2.6.4: each data packet has its own 500 ms
                             if (cap_off + (rx_n - 7'd3) >= ((script_pc == 5'd9) ? 7'd18 : 7'd17) || rx_n < 7'd11) begin
                                 if (script_pc == 5'd9) begin
                                     if (cap_off + (rx_n - 7'd3) >= 7'd12) begin
@@ -662,11 +711,15 @@ module usb_fs_host (
                         // take bytes back, so that read restarts); a duplicate (PID is the old toggle: our ACK was lost) is ACKed and dropped.
                         if (!rx_crc_ok) begin
                             ack_ok = 1'b0;
-                            if (script_pc == 5'd17) begin script_pc <= 5'd16; cap_kind <= 3'd0; end
+                            if (script_pc == 5'd17) begin
+                                script_pc <= 5'd16; cap_kind <= 3'd0;
+                                if (cfg_rs == CFG_RESTARTS) begin desc_tries <= DESC_TRIES_OUT; tries_pc <= 5'd16; end   // restarts used up: pc16 gives up
+                                else cfg_rs <= cfg_rs + 3'd1;
+                            end
                         end else if (first_pkt || rxb[0] == exp_pid) begin
                             exp_pid <= (rxb[0] == PID_DATA1) ? PID_DATA0 : PID_DATA1;
                             doff <= doff + {4'd0, rx_n - 7'd3};
-                            desc_tries <= 8'd0;
+                            desc_tries <= 10'd0;
                             if (script_pc == 5'd17) begin
                                 if ((doff + {4'd0, rx_n - 7'd3}) >= 11'd255 || (cfg_total != 16'd0 && {5'd0, doff + {4'd0, rx_n - 7'd3}} >= cfg_total)
                                     || {1'b0, rx_n - 7'd3} < {1'b0, mps_eff}) begin
@@ -687,12 +740,12 @@ module usb_fs_host (
                         end
                     end else begin                                  // a status stage done
                         case (script_pc)
-                            5'd1:    begin script_pc <= 5'd8; desc_tries <= 8'd0; end
+                            5'd1:    begin script_pc <= 5'd8; desc_tries <= 10'd0; adr_wait <= 2'd2; end   // SET_ADDRESS done: 2 ms recovery
                             // a boot keyboard: SET_PROTOCOL; everything else, FULL OR LOW SPEED, runs the generic descriptor phase (pc16...).  A low-speed
                             // device that is not a boot keyboard must not go straight to the poll (`ls ? 5'd4`): its report stream would work but no
                             // descriptor would be stored, so a low-speed retro adapter (e.g. a DragonRise 0079:0006) could not be parsed.  The control reads are
                             // the same at 1.5 Mbit/s (bMaxPacketSize0 8 -> 8-byte packets; one transaction per frame, each far shorter than 1 ms).
-                            5'd3:    begin script_pc <= (dev_kind == 2'd1) ? 5'd14 : 5'd16; desc_tries <= 8'd0; end
+                            5'd3:    begin script_pc <= (dev_kind == 2'd1) ? 5'd14 : 5'd16; desc_tries <= 10'd0; end
                             5'd15:   script_pc <= 5'd4;
                             default: script_pc <= script_pc + 5'd1;
                         endcase
@@ -705,6 +758,8 @@ module usb_fs_host (
                     // NAK/STALL: nothing to ACK, retry next frame; a NAK on
                     // the scanned endpoint proves it exists -> lock it
                     if (script_pc == 4'd4) ep_locked <= 1;
+                    // a STALLed data or status IN in the descriptor phase: this stage ends at the next frame (the give-up path)
+                    if (rxb[0] == PID_STALL && script_pc >= 5'd8) begin desc_tries <= DESC_TRIES_OUT; tries_pc <= script_pc; end
                     st <= S_SOF_IDLE;
                 end
             end

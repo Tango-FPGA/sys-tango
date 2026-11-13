@@ -49,7 +49,7 @@ module tango_ddr3_cport #(
     reg        inb = 1'b0;
     reg [7:0]  left = 8'd0;
     // the clk_ddr side out of reset (rst: until the IP has calibrated), synchronised to DDRAM_CLK: the core waits on
-    // DDRAM_BUSY until then (DDR3.md 5.4 rule 1, as the V port) -- without it the async FIFOs' write
+    // DDRAM_BUSY until then (as on the V port) -- without it the async FIFOs' write
     // sides showed room while their read sides were held in reset, and the core's commands were taken and lost
     reg  [1:0] rdy_s = 2'b00;
     always @(posedge DDRAM_CLK) rdy_s <= {rdy_s[0], !rst};
@@ -113,8 +113,8 @@ module tango_ddr3_cport #(
     // registers.  What used to be recomputed from the 9-bit sn / nb / 3-bit acc_n every clock (sn != 0, sn == nb,
     // acc_n == nb, acc_n < nb) is kept as registered flags, updated with the state they describe; and the late go
     // signals only SELECT between values that are computed from registers (as the arbiter's grant).
-    // Nothing visible at the port changes: the lockstep bench sim/tb_cport_equiv.v compares every output of the old module
-    // (sim/cport_ref) with this one on every clock.
+    // Nothing visible at the port changes: a lockstep simulation compares every output of the old module
+    // with this one on every clock.
     reg        busy = 1'b0, s_w = 1'b0;
     reg [24:0] sa = 25'd0;                                     // next beat (64-bit word) address
     reg [8:0]  sn = 9'd0;                                      // beats left in the command

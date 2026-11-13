@@ -386,8 +386,8 @@ module tango_link #(
     // Clamp to 0 when ul_off has run past ul_size_o+4 (the subtract would underflow/wrap in 24-bit
     // unsigned math otherwise): the original expression also returns false in that regime, PROVIDED
     // neither of ITS OWN two 24-bit adds wraps either (an_rx>=4 makes ul_off+an_rx >= ul_off+4 >
-    // ul_size_o+4 only when that arithmetic doesn't itself wrap at 2^24). sim/tb_ul_lim_equiv.v (now driving
-    // the real tango_ul_lim module below, run by sim/run_tb_ul_lim_equiv.sh) sweeps this: exhaustive over a
+    // ul_size_o+4 only when that arithmetic doesn't itself wrap at 2^24). An equivalence simulation (driving
+    // the real tango_ul_lim module below) sweeps this: exhaustive over a
     // bounded region (ul_size_o in [0,UL_MAX], ul_off in [0,2*UL_MAX], 67.2M checks, 0 mismatches), the
     // whole ul_off range at 12 sizes, and 20M random 24-bit pairs, plus an algebraic argument covering the
     // much larger region a real session can actually reach (ul_off keeps advancing on every completed READ while the slot stays open, not just
@@ -408,7 +408,7 @@ module tango_link #(
     // rx_stb with an_rx >= 4, i.e. rx_idx >= 2 = the 3rd byte of a LATER transfer, >= 24 SCK periods
     // (>= 1.8 us at the 13.33 MHz SDC limit) after CSN falls and after the UL_SELECT n5 / end_cnt==8 update
     // that moved ul_off/ul_size_o -- against 2 clk_pix cycles of lag.
-    // The module is separate only so sim/tb_ul_lim_equiv.v can drive the real RTL; synthesis flattens it.
+    // The module is separate only so a simulation can drive the real RTL; synthesis flattens it.
     wire [23:0] ul_lim;
     tango_ul_lim u_ul_lim (.clk(clk), .ul_size_o(ul_size_o), .ul_off(ul_off), .ul_lim(ul_lim));
 `endif

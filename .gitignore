@@ -1,7 +1,4 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 the Tango authors
 __pycache__/
-sim/obj*/
 bitstreams/
-ddr3/test/out/
-ddr3/test/out_*/

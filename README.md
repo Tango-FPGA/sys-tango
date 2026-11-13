@@ -1,6 +1,6 @@
 # sys-tango -- the Tango framework
 
-**Version 2026-10-27** (date code `20261027`)
+**Version 2026-11-13** (date code `20261113`)
 
 sys-tango is the framework every Tango core is built on: a MiSTer-style `sys/` for the
 **Sipeed Tang Console 138K**. A core mounts this repository as a git submodule at `sys/` and keeps its own code beside
@@ -9,7 +9,7 @@ BL616 microcontroller and its on-screen menu, the USB controller ports, the vide
 SDRAM or DDR3, MiSTer's video and audio processing, and the build scripts that turn a core into a bitstream.
 
 The framework has no bitstream of its own. It is built into every core, and each core's release carries that core's
-bitstreams (`.bin`). sys-tango is MIT-licensed except five files derived from MiSTer, which are under the GNU GPL: see
+bitstreams (`.bin`). sys-tango is MIT-licensed except four files derived from MiSTer, which are under the GNU GPL: see
 [Licence](#licence). A bitstream built with the GPL files is a work under the GPL. Nothing of Gowin's is in this
 repository: a build takes `PLL_INIT` (and, in DDR3 builds, the DDR3 IP) from the user's Gowin EDA installation. The
 BL616 firmware is released separately in [firmware-tango](https://github.com/Tango-FPGA/firmware-tango), and the launcher
@@ -30,7 +30,6 @@ that loads cores from the SD card in [menu-tango](https://github.com/Tango-FPGA/
 - [The shared SDRAM controller](#the-shared-sdram-controller)
 - [Timing constraints](#timing-constraints)
 - [Building](#building)
-- [Simulation benches](#simulation-benches)
 - [Layout](#layout)
 - [Attributions](#attributions)
 - [What was ported or adapted](#what-was-ported-or-adapted)
@@ -193,7 +192,7 @@ build is exactly as it was before the option existed.
 | `TANGO_VIDEO_DDR3=1` | (with ascal; not with `TANGO_ASCAL_EXT` or `TANGO_DBG`) ascal's frames in the DDR3: see [The DDR3 path](#the-ddr3-path). The SDRAM is then free for the core (`TANGO_SDRAM`), or keeps serving ports A/B (`TANGO_NES_SDRAM`) |
 | `TANGO_ASCAL_EXT=1` | (with ascal and `TANGO_SDRAM`; not with `TANGO_NES_SDRAM`) the core owns the SDRAM and its controller also serves ascal: see [A core that owns the SDRAM](#a-core-that-owns-the-sdram) |
 | `TANGO_VIDEO_F1=1` | (with ascal) the core drives `VGA_F1`: ascal detects interlaced video and weaves the fields, as on MiSTer, and the framework's scanlines are off while the input is interlaced |
-| `TANGO_VIDEO_OPTS=1` | (with ascal) the framework's Video page: Aspect ratio, Scale, Scanlines in `status[127:122]` |
+| `TANGO_VIDEO_OPTS=1` | (with ascal) the framework's Video page: Aspect ratio, Scale, Scanlines in `status[127:122]`; the framework reserves `status[127:118]` |
 | `TANGO_VIDEO_ROTATE=1` | (with `TANGO_VIDEO_DDR3`; sets `TANGO_DDRAM`) screen rotation for arcade cores: see [Rotation](#rotation) |
 | `TANGO_VIDEO_PROC=1` | (with ascal) MiSTer's video processing: polyphase filters, gamma, shadow mask; implies `TANGO_AUDIO_FILTER` |
 | `TANGO_AUDIO_FILTER=1` | MiSTer's audio filter, boost, stereo mix and global volume (any core) |
@@ -306,10 +305,6 @@ Without the option no rotation logic is built and the `CONF_STR` has no Rotation
 - The SDRAM is then free: a core can take it with `TANGO_SDRAM`, or keep the framework's controller for ports A/B
   with `TANGO_NES_SDRAM`. No debug top exists for DDR3 builds yet (`TANGO_DBG`).
 
-`ddr3/test/` is a standalone DDR3 bring-up test for the board (`build_ddr3_test.sh`): it measures the IP's
-calibration, command FIFO, refresh stalls, latency and bandwidth and runs a full memory test, and reports on an HDMI
-results screen (decoded from a capture by `decode_d1.py` / `d1_verdict.py`) and a UART line.
-
 ## Native-rate video (vsync_adjust)
 
 By default the HDMI output runs at 60 Hz (1650 x 750 at 74.25 MHz) and ascal repeats or drops a frame whenever the
@@ -369,10 +364,7 @@ preset (or single files) into the link transfers the firmware would send, as a l
 replays after reset. Point it at the files with `--root` or `TANGO_FILTERS_ROOT`: either a card layout (`Filters/`,
 `Gamma/`, `Shadow_Masks/`, `Filters_Audio/`, `Presets/`) or the three MiSTer-devel repositories cloned side by side.
 
-`build_tools/ascal_poly_model.py` and `build_tools/iir_model.py` are bit-exact models of the scaler's polyphase
-arithmetic and of the audio filter, which the cores' simulations compare with the RTL. `vproc_preset.py` (derived from
-Main_MiSTer's file readers) is GPL-3.0-only and `iir_model.py` (derived from MiSTer's audio filter) GPL-2.0-or-later;
-see [Licence](#licence).
+`vproc_preset.py` (derived from Main_MiSTer's file readers) is GPL-3.0-only; see [Licence](#licence).
 
 ## Controllers
 
@@ -485,7 +477,6 @@ You need, on Linux (x86-64):
   - **`PLL_INIT`**, `IDE/ipcore/PLL_ADV/data/PLL/pll_init.v`: the start-up calibration every PLL of the Console 138K's
     GW5AST-138 needs to lock. Every build adds it (the framework's PLL wrappers instantiate it, and a core's own PLL
     may too). `build_core.sh` prints the sha256 of the file it uses; the V1.9.11.03 one begins `3ef05a1b`.
-    `sim/run_tb_retune.sh` and `ddr3/test/build_ddr3_test.sh` take it from the same place.
   - **The DDR3 Memory Interface IP** (`TANGO_VIDEO_DDR3` builds), generated into each build by `ddr3/tango_ddr3_ip.tcl`.
 
   If `GOWIN_HOME` has no `IDE/bin/gw_sh` or no `pll_init.v`, the scripts stop with an error that names the path.
@@ -505,26 +496,6 @@ The framework is not built on its own: build a core (see its README). For exampl
 The bitstream is `build/out/<name>/impl/pnr/<name>.fs`; `build_tools/fs2bin.py <name>.fs <name>.bin` makes the `.bin`
 the Tango firmware loads from the SD card. Never flash a build whose STA gate failed.
 
-## Simulation benches
-
-The cores' simulation gates compile the framework with their own testbenches. `sim/` holds the framework's own
-benches for the blocks a core cannot exercise alone; each `run_tb_*.sh` builds with Verilator under
-`tango_capped.sh` and prints a PASS / FAIL line:
-
-| Script | What it checks |
-|---|---|
-| `sim/run_tb_tango_ddr3.sh`, `run_tb_tango_ascal_stream_ddr3.sh`, `run_tb_ascal_ddr3.sh`, `run_ddr3_matrix.py` | the DDR3 subsystem on a model of the IP's user interface (`sim/tango_ddr3_model.v`), ascal's real netlist streaming through it, and its margins |
-| `sim/run_tb_ddr3_arb_equiv.sh`, `run_tb_cport_equiv.sh` | the timing-closed arbiter and core port, clock for clock against their earlier forms (`sim/ddr3_arb_ref/`, `sim/cport_ref/`), with mutants |
-| `sim/run_tb_ddr3_test.sh` | the DDR3 bring-up test's logic on the IP model |
-| `sim/run_tb_rotate.sh`, `run_tb_rot_scale.sh` | the rotation client (allocator, port traffic, a pixel-exact golden model) and the arcade Scale entry |
-| `sim/run_tb_vsync_ddr3.sh`, `run_tb_hdmi_totals.sh`, `run_tb_retune.sh` | native-rate video, the HDMI raster at other totals, the pixel-clock retune |
-| `sim/run_tb_ascal_ext.sh`, `run_tb_tango_ascal_words.sh` | `TANGO_ASCAL_EXT` and `tango_ascal_words.v` |
-| `sim/run_tb_ul_lim_equiv.sh` | the upload read bound in `tango_link.v` |
-| `sim/pads/run_tb_pad_decode.sh` | `tango_pad_decode.v` against vectors generated from the firmware's C reference decode, and its DS4 table against the built-in decode |
-
-Some benches compare against files of the Template core or of the framework's own history and need those at hand
-(see each script's header).
-
 ## Layout
 
 | Path | What |
@@ -540,12 +511,11 @@ Some benches compare against files of the Template core or of the framework's ow
 | `tango_vsync.v`, `tango_pll_retune.v` | native-rate video: the raster planner and the pixel-clock retune |
 | `ascal.vhd`, `ascal_ghdl/` | TEMLIB ascal, and the GHDL netlists the builds and simulations use (`gen.sh` regenerates them) |
 | `tango_sdram.v`, `tango_ab_slot.v`, `tango_ascal_words.v` | the shared SDRAM controller, the A/B ports' core-clock front end, the word adapter for `TANGO_ASCAL_EXT` |
-| `tango_ddr3.v`, `tango_ddr3_arb.v`, `tango_ddr3_vport.v`, `tango_ddr3_cport.v`, `tango_ddr3_fifo.v`, `ddr3/` | the DDR3 subsystem, the IP's generation script and the bring-up test |
+| `tango_ddr3.v`, `tango_ddr3_arb.v`, `tango_ddr3_vport.v`, `tango_ddr3_cport.v`, `tango_ddr3_fifo.v`, `ddr3/` | the DDR3 subsystem and the IP's generation script |
 | `tango_vproc_regs.v`, `tango_gamma.v`, `tango_shmask.v`, `tango_audio_filter.v` | MiSTer's video and audio processing |
 | `hdmi/` | the HDMI encoder (hdl-util, modified; see `hdmi/README.md`) |
 | `board/console138k/` | the board top, PLLs, pin constraints (`.cst`), SDCs, `build_core.sh` / `build_core.tcl` |
-| `build_tools/` | `tango_capped.sh`, `sta_gate.py`, `fs2bin.py`, `confstr_expand.py`, `vproc_preset.py`, `ascal_poly_model.py`, `iir_model.py` |
-| `sim/` | the framework's own simulation benches and models |
+| `build_tools/` | `tango_capped.sh`, `sta_gate.py`, `fs2bin.py`, `confstr_expand.py`, `vproc_preset.py` |
 
 ## Attributions
 
@@ -555,7 +525,7 @@ Third-party files, with their terms as the files state them (see `NOTICE`):
 
 | File | Derived from ([MiSTer-devel](https://github.com/MiSTer-devel), compared at Template_MiSTer `5dda373` / Main_MiSTer `c3dc8ed`) | Upstream copyright as stated | Licence (SPDX) |
 |---|---|---|---|
-| `tango_audio_filter.v`, `build_tools/iir_model.py` | Template_MiSTer `sys/iir_filter.v` (`IIR_filter`, `iir_filter_tap`, `DC_blocker`), `sys/audio_out.sv` (`aud_mix_top`) | "Copyright (C) 2020 Sorgelig"; "(c)2020-2026 Alexey Melnikov" | `GPL-2.0-or-later` (as both files: "version 2 of the License, or (at your option) any later version") |
+| `tango_audio_filter.v` | Template_MiSTer `sys/iir_filter.v` (`IIR_filter`, `iir_filter_tap`, `DC_blocker`), `sys/audio_out.sv` (`aud_mix_top`) | "Copyright (C) 2020 Sorgelig"; "(c)2020-2026 Alexey Melnikov" | `GPL-2.0-or-later` (as both files: "version 2 of the License, or (at your option) any later version") |
 | `tango_shmask.v` | Template_MiSTer `sys/shadowmask.sv` | none in the file | `GPL-2.0-or-later` (no header, no version stated; GPLv2 section 9: "If the Program does not specify a version number of this License, you may choose any version ever published by the Free Software Foundation") |
 | `tango_video_geo.v` | Template_MiSTer `sys/video_freak.sv` (`video_freak`, `video_scale_int`), `sys/sys_top.v` lines 856-944 | "Copyright (c) 2020 Grabulosaure, (c) 2021 Alexey Melnikov"; "Copyright (c) 2021 Alexey Melnikov"; "(c)2017-2020 Alexey Melnikov" | `GPL-2.0-or-later` (video_freak.sv: "GPL Licensed", no version, so GPLv2 section 9; sys_top.v: version 2 or later) |
 | `build_tools/vproc_preset.py` | Main_MiSTer `audio.cpp`, `video.cpp`, `file_io.cpp` | none in the files | `GPL-3.0-only` (no headers; Main_MiSTer's LICENSE is the GPL version 3) |
@@ -572,7 +542,7 @@ Gowin's documentation) cited in the file.
 | Component | Files | Author | Terms |
 |---|---|---|---|
 | **ascal**, the "Avalon scaler" | `ascal.vhd` (byte-identical to `sys/ascal.vhd` of MiSTer-devel/Genesis_MiSTer at commit `adc0c42`); the GHDL netlists `ascal_ghdl/ascal_fixed*.v` (machine translations); `ascal_ghdl/ascal_poly_bram.patch` (our modification, applied to a copy) | TEMLIB (2018-2020), as carried and extended by the MiSTer project | ascal.vhd's own terms: "freely distributed and used for any purpose"; bugs and enhancements to info@temlib.org |
-| **hdmi** | `hdmi/*.sv` (modified copies, see `hdmi/README.md`); `sim/hdmi_acr_sim.sv` (a simulation-only copy of one of them) | Sameer Puri, [hdl-util/hdmi](https://github.com/hdl-util/hdmi) | MIT (`hdmi/LICENSE-MIT`), offered by upstream as MIT or Apache-2.0 |
+| **hdmi** | `hdmi/*.sv` (modified copies, see `hdmi/README.md`) | Sameer Puri, [hdl-util/hdmi](https://github.com/hdl-util/hdmi) | MIT (`hdmi/LICENSE-MIT`), offered by upstream as MIT or Apache-2.0 |
 | **Gowin `PLL_INIT`** | not in this repository: `IDE/ipcore/PLL_ADV/data/PLL/pll_init.v` of the user's Gowin EDA installation, added to every build by `build_core.sh` (see [Building](#building)) | Gowin Semiconductor Corporation | the licence of the user's Gowin EDA |
 | **Gowin DDR3 Memory Interface IP** | not in this repository: generated into each `TANGO_VIDEO_DDR3` build by `ddr3/tango_ddr3_ip.tcl` | Gowin Semiconductor Corporation | the licence of the user's Gowin EDA |
 
@@ -609,13 +579,12 @@ Gowin's PLL primitive with its settings, each parameter commented from Gowin's U
   IP's configuration, its PLL settings and the DDR3 pin constraints). **Winbond**: the W9825G6KH datasheet (every
   SDRAM timing rule in `tango_sdram.v` cites its section). **Gowin**: IPUG281 (the DDR3 IP's user interface) and
   UG306 (the PLL). **Bouffalo Lab**: the BL616 SDK (the SPI mode). The USB 2.0 and HID 1.11 specifications (the USB
-  host). The HDMI 1.4 and CEA-861 specifications (in hdl-util's encoder). JEDEC JESD79-3 (the DDR3 model's burst
-  order).
+  host). The HDMI 1.4 and CEA-861 specifications (in hdl-util's encoder).
 
 ## What was ported or adapted
 
 - **From MiSTer (derived, GPL):** `video_freak`'s placement rules (`tango_video_geo.v`), the shadow mask
-  (`tango_shmask.v`), the audio filter and mix (`tango_audio_filter.v`, `iir_model.py`), the file readers of the
+  (`tango_shmask.v`), the audio filter and mix (`tango_audio_filter.v`), the file readers of the
   build-time presets (`vproc_preset.py`).
 - **From MiSTer (reimplemented from behaviour):** the core interface of `hps_io` and the emu ports, so a MiSTer core's
   `emu` maps onto `tango_core` almost signal for signal; the `CONF_STR` and option word; the Video page entries; the
@@ -634,8 +603,8 @@ Gowin's PLL primitive with its settings, each parameter commented from Gowin's U
 
 MIT (`LICENSE`): Copyright (c) 2026 the Tango authors, **except**:
 
-- the five files derived from MiSTer (see [Attributions](#attributions)): `tango_audio_filter.v`,
-  `build_tools/iir_model.py`, `tango_shmask.v` and `tango_video_geo.v` (GPL-2.0-or-later),
+- the four files derived from MiSTer (see [Attributions](#attributions)): `tango_audio_filter.v`,
+  `tango_shmask.v` and `tango_video_geo.v` (GPL-2.0-or-later),
   `build_tools/vproc_preset.py` (GPL-3.0-only);
 - the third-party files listed in `NOTICE`, under their own terms (TEMLIB ascal, hdl-util's HDMI encoder).
 
@@ -651,5 +620,5 @@ of the core. `tango_video_geo.v` is in every build with a video path (`TANGO_VID
 practice in every core; `tango_audio_filter.v` is in every `TANGO_AUDIO_FILTER` build and `tango_shmask.v` in every
 `TANGO_VIDEO_PROC` build. The HDL files from MiSTer are all GPL-2.0-or-later: with an MIT or GPL-2.0-or-later core the
 bitstream is under GPL-2.0-or-later, with a GPL-3.0 core under GPL-3.0. `PLL_INIT` and the DDR3 IP, which a build takes
-from the user's Gowin installation, keep Gowin's terms (`NOTICE`). `vproc_preset.py` and `iir_model.py` are host tools and are
+from the user's Gowin installation, keep Gowin's terms (`NOTICE`). `vproc_preset.py` is a host tool and is
 not part of a bitstream; a `TANGO_VPROC_PRESET` build contains `vproc_preset.py`'s generated output, not its code.

@@ -213,7 +213,7 @@ module tango_ddr3_arb #(
     // lane, and its worst remaining hload path was exactly that lane's, hload_8 -> hd_a with a 3.7 ns hop).  Every
     // copy equals its original every clock (same reset, same update, equal inputs by induction: checked below in
     // simulation); hd_v and hd_w themselves still drive fire and the IP, combinational on cmd_ready / wr_data_rdy
-    // as before (a cmd_en while cmd_ready is low would be a dropped command, sim/tango_ddr3_model.v).
+    // as before (a cmd_en while cmd_ready is low would be a dropped command in the IP).
     reg  [2:0]   m_n = 3'd0;                                  // entries in the queue's memory (not the head)
     reg          hd_v = 1'b0, hd_w = 1'b0;                      // the head holds a command; a write
     reg  [28:0]  hd_a = 29'd0;

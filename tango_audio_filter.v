@@ -40,7 +40,7 @@
 // the global attenuation (0x26 UIO_AUDVOL: >>> att[3:0], att[4] mutes) and the 16-bit clamp.  Linux audio (ALSA) is
 // MiSTer's only (0 here).  MiSTer powers up muted (sys_top.v 317-318: vol_att = 5'b11111 until Main sends the volume);
 // Tango powers up at full volume (att 0): a board without the firmware still sounds.
-// Bit-exact model: build_tools/iir_model.py.
+// Checked bit for bit against a model of MiSTer's arithmetic in simulation.
 //==============================================================================
 `default_nettype none
 // CLK_HZ_P / S48_* (the TANGO_HDMI_PLL presets): the pixel clock and the exact 48 kHz strobe pair for

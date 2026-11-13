@@ -5,7 +5,7 @@
 // Avalon master), one core port (tango_ddr3_cport, MiSTer's DDRAM_*) and the arbiter (tango_ddr3_arb) onto the Gowin
 // DDR3 IP's user interface.  Everything here runs in the IP's clk_out (clk_ddr, 100 MHz) except the core port's core
 // side (DDRAM_CLK).  The IP, its PLL (board/console138k/pll_ddr3.v) and the pins are the board top's; sims put
-// sim/tango_ddr3_model.v on the same user interface.
+// a model of the IP on the same user interface.
 // Address map: the scaler's buffers at 0x2000_0000 (its writes limited to 0x2000_0000-0x21FF_FFFF), the
 // core window 0x3000_0000-0x3FFF_FFFF (forced by the core port), fence reads at 0.
 // Parameters (tango_ddr3_arb): G = consecutive V grants before a waiting core command goes; Q_CORE = the most core

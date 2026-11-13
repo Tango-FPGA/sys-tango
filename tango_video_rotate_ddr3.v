@@ -85,7 +85,7 @@ module tango_video_rotate_ddr3 #(
                                                        // system task 'error' is ignored for synthesis"), so
                                                        // it is no guarantee on that toolchain.
     parameter integer FIFO_DEPTH = 64,                // elastic FIFO entries ahead of the DDRAM_* write FSM:
-                                                        // the arbiter bench measures a worst-case DDRAM_BUSY
+                                                        // simulation of the arbiter measures a worst-case DDRAM_BUSY
                                                         // stall of 762 clk_video cycles (10.26 us) at the
                                                         // Template core's rate under V-port contention, which
                                                         // needs ~63 pixels of buffering at its pixel period
@@ -233,7 +233,7 @@ module tango_video_rotate_ddr3 #(
     // still in flight: `rbuf` itself does not advance until the fence succeeds (a few clk_ddr cycles later,
     // ~270 ns), so for that whole window the newly chosen wbuf and the *still-current* rbuf are, by the
     // alternating-bank construction, exactly TWO generations apart -- which lands them in the SAME bank
-    // (two bank flips cancel out; sim/tb_rotate_beat.v catches that case).  So the allocator does not run
+    // (two bank flips cancel out; a simulation catches that case).  So the allocator does not run
     // until `rbuf` itself is about to settle, i.e. at the fence's own success (using `fence_buf`, the value
     // `rbuf` becomes on this same edge, as the reference) or immediately at `vs_rise` only in the
     // no-fence-needed dropped-frame case (where `rbuf` never moves, so the CURRENT `rbuf` is already the
@@ -283,7 +283,7 @@ module tango_video_rotate_ddr3 #(
     end
 
     // ================= write FSM: pop the FIFO, step the rotated address, issue DDRAM_WE =================
-    // Address algebra (checked pixel-exact against a golden model by sim/tb_rotate_golden.v).  A native pixel
+    // Address algebra (checked pixel-exact against a golden model in simulation).  A native pixel
     // (x, y) of a W x H frame goes to the rotated fb_w x fb_h frame (fb_w = H, fb_h = W) at:
     //   CW:  output column H-1-y, output row x;        CCW: output column y, output row W-1-x.
     // So the FIRST native row lands in the LAST output column for CW (the first for CCW), and each later native

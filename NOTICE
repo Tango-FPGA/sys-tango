@@ -4,11 +4,11 @@ sys-tango -- licences and third-party components
 sys-tango is the Tango authors' code under the MIT licence in LICENSE, EXCEPT the files and lines listed
 below, which keep the terms of the work they come from.
 
-Every source file the Tango authors wrote (HDL, constraints, scripts, testbenches) states its licence in an
+Every source file the Tango authors wrote (HDL, constraints, scripts) states its licence in an
 SPDX-License-Identifier line, with these exceptions, which are MIT without a header:
   - ascal_ghdl/ascal_fixed.vhd, ascal_fixed8.vhd, ascal_fixed_ddr3.vhd, ascal_fixed8_ddr3.vhd: the GHDL
     netlists (ascal_ghdl/ascal_fixed*.v) record their sha256, so they are kept byte for byte;
-  - tango_ov_geom.vh and sim/pads/pad_vectors.txt: generated files ("do not edit");
+  - tango_ov_geom.vh: a generated file ("do not edit");
   - the documentation (README.md, hdmi/README.md and the other text files).
 The licence texts are in LICENSES/: GPL-2.0.txt and GPL-3.0.txt (the GNU General Public License versions 2 and 3,
 unchanged, as distributed by Debian/Ubuntu in /usr/share/common-licenses/GPL-2 and GPL-3, package base-files).
@@ -17,12 +17,11 @@ The third-party files below carry their authors' headers (or none, where the ups
 
 Files under the GNU General Public License (derived from MiSTer)
 -----------------------------------------------------------------
-These five files are derived from the MiSTer project's framework code (https://github.com/MiSTer-devel): they
+These four files are derived from the MiSTer project's framework code (https://github.com/MiSTer-devel): they
 follow the upstream modules' structure, statement order and names.  Each file's header names its source and its
 terms.  They are NOT under the MIT licence.
 
   tango_audio_filter.v          SPDX: GPL-2.0-or-later
-  build_tools/iir_model.py      SPDX: GPL-2.0-or-later
       Source:  Template_MiSTer (https://github.com/MiSTer-devel/Template_MiSTer), compared at commit
                5dda37366d02b04b8448da7b322235c1831af811:
                sys/iir_filter.v (modules IIR_filter, iir_filter_tap, DC_blocker), "Copyright (C) 2020 Sorgelig";
@@ -67,7 +66,7 @@ of the rest of the core:
   - tango_shmask.v in every TANGO_VIDEO_PROC build.
 The HDL files from MiSTer are all GPL-2.0-or-later, so they combine with a core under GPL-2.0-or-later, MIT or
 another GPL-2.0-or-later-compatible licence under GPL-2.0-or-later, and with a GPL-3.0 core under GPL-3.0.
-build_tools/vproc_preset.py (GPL-3.0-only) and build_tools/iir_model.py are host tools and are not part of any
+build_tools/vproc_preset.py (GPL-3.0-only) is a host tool and is not part of any
 bitstream; a TANGO_VPROC_PRESET build contains vproc_preset.py's generated output (tango_vproc_preset.vh, the
 transfers made from MiSTer's filter files), not its code.  The other parts of a build keep their own terms:
 TEMLIB's ascal (below), and what the build takes from the user's Gowin EDA installation under that installation's
@@ -169,8 +168,6 @@ ascal_shim8_ddr3.v, ascal_ghdl/gen.sh) is the Tango authors' own code (MIT).
 hdl-util HDMI encoder
 ---------------------
 Files:  hdmi/*.sv
-        sim/hdmi_acr_sim.sv   (a simulation-only copy of hdmi/audio_clock_regeneration_packet.sv with its
-                               constants worked out for Verilator)
 Source: github.com/hdl-util/hdmi by Sameer Puri, MIT / Apache-2.0, used under MIT (hdmi/LICENSE-MIT);
         modified copies (each modified file's header says what changed; hdmi/README.md lists the changes).
 
@@ -178,12 +175,11 @@ Source: github.com/hdl-util/hdmi by Sameer Puri, MIT / Apache-2.0, used under MI
 Gowin Semiconductor -- taken from the user's Gowin EDA installation, not in this repository
 -----------------------------------------------------------------------------------------
 Nothing of Gowin's is in this repository.  A build takes these from the Gowin EDA IDE it runs on (GOWIN_HOME, default
-~/gowin: board/console138k/build_core.sh, ddr3/test/build_ddr3_test.sh, sim/run_tb_retune.sh; README "Building"),
+~/gowin: board/console138k/build_core.sh; README "Building"),
 under the licence of that installation:
   - PLL_INIT: IDE/ipcore/PLL_ADV/data/PLL/pll_init.v (module PLL_INIT; the framework is built and tested with the
     V1.9.11.03 file, sha256 3ef05a1ba92157d73e3c54ed9d589645508a4ae332d8bcf133a0457cc3e866c8).  Every build adds it:
     every GW5AST PLL needs it to lock, and the framework's PLL wrappers (and some cores' own PLLs) instantiate it.
-    sim/run_tb_retune.sh compiles it from the same place.
   - The Gowin DDR3 Memory Interface IP (TANGO_VIDEO_DDR3 builds): ddr3/tango_ddr3_ip.tcl has the IDE generate it
     into each build.  Its configuration follows Sipeed's DDR3 example for the board.
   - The device primitives (PLL, PLLA, OSER10, DCE, ...) are the toolchain's; their names, parameters and ports are

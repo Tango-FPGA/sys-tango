@@ -58,8 +58,8 @@ module usb_fs_phy (
     wire se0_phase  = line_drive && ((tx_st == TXS_EOP1) || (tx_st == TXS_EOP2));
     wire eopj_phase = line_drive && (tx_st == TXS_EOPJ);
     // LOW SPEED: line_drive is released by TXS_IDLE on the next bit-cell enable, up to 8 clocks after the EOP's J bit; line_k still holds the last data bit
-    // and, with ls = 1, would drive that stale K onto the bus for up to a quarter of a bit time right after every EOP (the low-speed bench's wire
-    // monitor read it as a start of packet 1 bit after the EOP, and as both lines high against the device's own J).  With ls = 1 the data
+    // and, with ls = 1, would drive that stale K onto the bus for up to a quarter of a bit time right after every EOP (a wire monitor in
+    // simulation read it as a start of packet 1 bit after the EOP, and as both lines high against the device's own J).  With ls = 1 the data
     // level is therefore driven only while sending; with ls = 0 line_k is used as it always was (the full-speed path is unchanged: its glitch is one clock).
     wire k_now = line_k && (!ls || tx_st == TXS_SEND || tx_st == TXS_LASTBIT);
     wire dp_drive_val = se0_phase ? 1'b0 : (eopj_phase ? 1'b1 : (k_now ? 1'b0 : 1'b1));
@@ -77,11 +77,11 @@ module usb_fs_phy (
     reg [2:0] ce_div = 3'd0;
     always @(posedge clk48) ce_div <= ce_div + 3'd1;
     wire ce = !ls || (ce_div == 3'd0);
-    // LOW SPEED inter-packet gap (found by the low-speed bench's independent wire monitor): the host answered a device packet (the ACK of an
+    // LOW SPEED inter-packet gap (found by an independent wire monitor in simulation): the host answered a device packet (the ACK of an
     // interrupt report or of a control data packet) one bit time after the device's EOP SE0 ended, i.e. as the device was still driving its EOP J bit
     // (both drivers on the wire; D+ and D- both high in the sim) -- the full-speed path is 2+ bit times only because its sequencing is 8x faster than
     // the bit rate, not by design.  At low speed a transmission now starts only when the line has been out of SE0 for at least 2 bit times
-    // (8 enables), the bench's criterion for the full-speed host too ("host inter-packet delay >= 2 bit times", USB 2.0 7.1.18.1 as cited there;
+    // (8 enables), the criterion the simulation applies to the full-speed host too ("host inter-packet delay >= 2 bit times", USB 2.0 7.1.18.1 as cited there;
     // the spec text is not in this tree).  With ls = 0 tx_gap_ok is 1: the full-speed path is unchanged.
     reg [3:0] j_since = 4'd15;
     wire cur_se0_i = ~dp_s1 & ~dn_s1;

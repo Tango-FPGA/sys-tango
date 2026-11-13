@@ -3,13 +3,13 @@
 //==============================================================================
 // tango_pad_decode -- table-driven pad decode, in the USB host's clock (clk48), one instance per USB-A port
 // (tango_sys.v; the tables come from the firmware's controller database over the link, tango_link.v SET_DECODE).
-// Reference model: menu-tango bl616/tango/tango_paddec.c pd_eval(); sim/pads/pad_vectors.txt is generated from it
-// and replayed by sim/pads/.
+// Reference model: menu-tango bl616/tango/tango_paddec.c pd_eval(); test vectors generated from it
+// are replayed against this module in simulation.
 //
 // WHAT IT DOES.  A table of up to 64 entries says "raw bit OUT is set when this FIELD of the report satisfies this TEST".
 // On every accepted USB report (rpt_tog flips) it walks the table ONE ENTRY PER CLOCK and ORs the answers into a 32-bit raw
 // word, which it publishes with a toggle.  Latency from the report to the word = count + 4 clk48 (about 0.5 to 1.4 us for
-// real pads, measured in sim/pads/); the host's own 1 ms poll is 1000x longer.  The word then crosses to clk_pix exactly as
+// real pads, measured in simulation); the host's own 1 ms poll is 1000x longer.  The word then crosses to clk_pix exactly as
 // the report bytes do today (rpt_tog + held data), but it is 32 bits instead of 64, and no decode logic sits in clk_pix.
 //
 // TABLE ENTRY (36 bits, the width of a GW5A BSRAM word):

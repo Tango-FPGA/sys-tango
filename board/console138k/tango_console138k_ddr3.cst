@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 the Tango authors
 // tango_console138k_ddr3.cst -- TANGO_VIDEO_DDR3 builds (build_core.sh appends it to the board cst): the DDR3 pins and
-// the placement of the DDR3 PLL and the IP's DLL / clock divider, exactly as the DDR3 bring-up test's
-// ddr3/test/tango_ddr3_test.cst (Sipeed's DDR3 example for the Tang Console 138K, its ddr_memory/ddr_memory_test_uart/
+// the placement of the DDR3 PLL and the IP's DLL / clock divider, exactly as the DDR3 bring-up test
+// (Sipeed's DDR3 example for the Tang Console 138K, its ddr_memory/ddr_memory_test_uart/
 // src/ddr3_1v4_hs.cst: banks 6 (data) and 7 (address / command), SSTL15 at 1.5 V; the PLL at PLL_L[0]), proven on
 // silicon by that test.  Instance names: the board top's u_plld (pll_ddr3) and u_ddr3 (the IP).
 IO_LOC  "ddr_bank[2]"   M6;

@@ -68,7 +68,7 @@ module tango_ddr3_vport #(
     // room for a command: a register, conservative by one (each count grows by at most one a clock) (timing).
     // None in reset: rst is high until the IP has calibrated (tango_sys), and ascal must wait for it with
     // waitrequest -- without this the FIFOs, held in reset, showed room, so commands and beats
-    // were taken and dropped (sim/tb_ascal_ddr3.v: ascal's first write burst and reads before calibration)
+    // were taken and dropped (in simulation: ascal's first write burst and reads before calibration)
     reg  can_cmd = 1'b0;
     always @(posedge clk) can_cmd <= !rst && (cq_n + 1'b1 < (1 << CQ_LOG2)) && (wq_n + 1'b1 + WQ_RES <= (1 << WQ_LOG2));
     assign avl_waitrequest = inb ? 1'b0 : !can_cmd;
