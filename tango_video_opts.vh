@@ -85,13 +85,28 @@
 // unchanged 3-entry list, not a 4th dead entry.
 `define TANGO_VO_B_ROTATE  119:118
 `define TANGO_VO_E_ROTATE  "O[119:118],Rotation,Normal,CW,CCW;"
+// TANGO_VIDEO_NO_ROTATE builds (tango_cfg.vh): the menumask bit that hides the Rotation entry, and the entry's prefix
+// that tests it.  The two must name the same bit: H<c> with c = 0-9, A-V for bits 0-31 (MiSTer's index characters;
+// menu-tango bl616/tango/confstr.c idx_char), and the firmware reads a 16-bit menumask (bits 0-15), so 15 = 'F' is
+// the highest bit it can test.  tango_sys.v drives this bit from the core's VIDEO_NO_ROTATE.  The prefix goes BEFORE
+// the page prefix: the firmware takes H/h/D/d prefixes first, then P# (confstr.c cs_parse), so "P1HFO[...]" would not
+// parse as an option and "HFP1O[...]" does.  Not a TANGO_VO_E_ name: confstr_expand.py pairs each TANGO_VO_E_<x> with
+// a TANGO_VO_B_<x>.
+`define TANGO_VO_MM_NOROT  15
+`define TANGO_VO_H_NOROT   "HF"
 // the lists a core puts in its CONF_STR (the TANGO_VO_E_* above, in that order). TANGO_VIDEO_ROTATE's presence
 // (not TANGO_VIDEO_OPTS's) decides whether the Rotate entry is in the list, and whether Scale is the arcade
 // 2-value entry (TANGO_VO_E_SCALE_ARC) or the console 4-value one -- see the O[125:124] note above:
 // this is the ONLY place in the framework that must stay gated this way, so no console
 // core (which never defines TANGO_VIDEO_ROTATE) can ever reach the entry, by construction, not by convention.
+// TANGO_VIDEO_NO_ROTATE (implies TANGO_VIDEO_ROTATE, tango_cfg.vh): the same list with the Rotation entry prefixed by
+// `TANGO_VO_H_NOROT, so the entry is hidden while the core's VIDEO_NO_ROTATE is high.  Without it the list text is
+// unchanged.
 `ifdef TANGO_VIDEO_OPTS
- `ifdef TANGO_VIDEO_ROTATE
+ `ifdef TANGO_VIDEO_NO_ROTATE
+ `define TANGO_VIDEO_CONF       `TANGO_VO_E_ASPECT, `TANGO_VO_E_SCALE_ARC, `TANGO_VO_E_SL, {`TANGO_VO_H_NOROT, `TANGO_VO_E_ROTATE}
+ `define TANGO_VIDEO_CONF_P(PX) {PX, `TANGO_VO_E_ASPECT}, {PX, `TANGO_VO_E_SCALE_ARC}, {PX, `TANGO_VO_E_SL}, {`TANGO_VO_H_NOROT, PX, `TANGO_VO_E_ROTATE}
+ `elsif TANGO_VIDEO_ROTATE
  `define TANGO_VIDEO_CONF       `TANGO_VO_E_ASPECT, `TANGO_VO_E_SCALE_ARC, `TANGO_VO_E_SL, `TANGO_VO_E_ROTATE
  `define TANGO_VIDEO_CONF_P(PX) {PX, `TANGO_VO_E_ASPECT}, {PX, `TANGO_VO_E_SCALE_ARC}, {PX, `TANGO_VO_E_SL}, {PX, `TANGO_VO_E_ROTATE}
  `else

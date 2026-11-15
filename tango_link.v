@@ -837,8 +837,22 @@ module tango_link #(
         e_at  <= (ecnt == bpc_m1);
         for (pk = 0; pk < 64; pk = pk + 1) pm_sel[pk] <= !pm_j[5] && ({pm_j[4:0], pm_half} == pk);
     end
+    // An ATLAS column's write, outside the byte decode's if / else-if ladder (timing: through
+    // the ladder its enable was 10 LUTs deep, and the column's zero bits were cleared through their reset pins: clk_pix
+    // failed by 0.91 ns at at_wd in one Galaga draw).  at_go is exactly the condition under which the ladder reached
+    // the write: not in reset, a byte, not byte 0 or 1, OSD ATLAS, not n0 or n1, the column complete.  The ladder's
+    // earlier branches are flags of other (target, command) pairs, registered from the same tgt / cmd as f_osd_atlas,
+    // so none of them is set while f_osd_atlas is.
+    wire at_go = !lrst && rx_stb && !i0 && !i1 && f_osd_atlas && !n0 && !n1 && e_at;
     always @(posedge clk) begin
-        at_we <= 1'b0; gl_we <= 1'b0; rt_we <= 1'b0; pal_we <= 1'b0; geo_we <= 1'b0;
+        at_we <= at_go;
+        if (at_go) begin
+            at_wa <= acol;
+            at_wd <= (ecnt == 3'd0) ? {{(ATW-8){1'b0}}, rx_byte} : {aw, rx_byte};
+        end
+    end
+    always @(posedge clk) begin
+        gl_we <= 1'b0; rt_we <= 1'b0; pal_we <= 1'b0; geo_we <= 1'b0;
         en_we <= 1'b0; swap_we <= 1'b0;
         if (csn_q1 && !csn_s[1]) seen_cmd <= 1'b0;
 `ifdef TANGO_IOCTL_UPLOAD
@@ -1145,9 +1159,7 @@ module tango_link #(
                 if (n0) acol[9:8] <= rx_byte[1:0];
                 else if (n1) begin acol[7:0] <= rx_byte; ecnt <= 3'd0; end
                 else if (e_at) begin                            // ecnt == bpc_m1
-                    ecnt <= 3'd0;
-                    at_we <= 1'b1; at_wa <= acol;
-                    at_wd <= (ecnt == 3'd0) ? {{(ATW-8){1'b0}}, rx_byte} : {aw, rx_byte};
+                    ecnt <= 3'd0;                               // (the column's write: at_go, above)
                     acol <= acol + 10'd1;
                 end else begin
                     // first byte of a column clears the older bytes (zero-extension)

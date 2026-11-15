@@ -109,5 +109,21 @@ if {[info exists env(TANGO_SYN_RETIME)] && $env(TANGO_SYN_RETIME) == "1"} {
     set_option -route_option 2
     set_option -correct_hold_violation 1
 }
+# TANGO_PNR_EFFORT (opt-in, default off): timing-driven, maximum-effort place and route with the automatic hold fix
+# (-timing_driven, -place_option 4, -route_option 2, -correct_hold_violation) WITHOUT -retiming: retiming moves
+# registers, which can break the CDC synchroniser chains and the cycle-exact structure of the DDR3 blocks; these
+# options only change where the same netlist is placed and how it is routed.
+# TANGO_PNR_REPLICATE (opt-in, default off): place and route replicates high-fanout resources (-replicate_resources,
+# GW5A only; SUG100 9).  For nets this repository cannot restructure, such as the DDR3 IP's own command FIFO read
+# pointer.
+if {[info exists env(TANGO_PNR_REPLICATE)] && $env(TANGO_PNR_REPLICATE) == "1"} {
+    set_option -replicate_resources 1
+}
+if {[info exists env(TANGO_PNR_EFFORT)] && $env(TANGO_PNR_EFFORT) == "1"} {
+    set_option -timing_driven 1
+    set_option -place_option 4
+    set_option -route_option 2
+    set_option -correct_hold_violation 1
+}
 run syn
 run pnr

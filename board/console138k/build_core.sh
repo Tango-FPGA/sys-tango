@@ -28,7 +28,8 @@
 # SDC; the core's SDC declares its memory clock.  TANGO_VIDEO_F1=1 (with TANGO_VIDEO_ASCAL=1): the core drives
 # VGA_F1 (tango_cfg.vh).
 # TANGO_VIDEO_OPTS=1 (with TANGO_VIDEO_ASCAL=1): the core opts in to the framework's Video options
-# (sys/tango_video_opts.vh: Aspect ratio / Scale / Scanlines = status[127:120], decoded by sys/tango_video.v).
+# (sys/tango_video_opts.vh: Aspect ratio / Scale / Scanlines = status[127:122], decoded by sys/tango_video.v; the
+# framework reserves status[127:118], TANGO_VO_HI..TANGO_VO_LO).
 # TANGO_VIDEO_ROTATE=1 (README "Rotation"): needs TANGO_VIDEO_DDR3=1, not just TANGO_VIDEO_ASCAL=1 -- the rotated
 # picture is written through tango_ddr3's C0 port (sys/tango_video_rotate_ddr3.v), so this also defines
 # `TANGO_DDRAM` (the C0 port's own build option) automatically. rotate_mode is CDC'd from
@@ -40,6 +41,8 @@
 # Limitation: this claims the whole of C0 for the rotation client. A core that also wants MiSTer-style DDRAM_*
 # traffic of its own, together with TANGO_VIDEO_ROTATE, would need a second core port (NC=2) and is not supported
 # by this flag.
+# TANGO_VIDEO_NO_ROTATE=1 (with TANGO_VIDEO_ROTATE=1): the core drives VIDEO_NO_ROTATE, which forces rotation off and
+# hides the Rotation entry for a landscape game (sys/tango_cfg.vh, README "Rotation").
 # TANGO_VIDEO_PROC=1 (with TANGO_VIDEO_ASCAL=1): MiSTer's video processing -- polyphase filters, gamma, shadow mask
 # -- and its audio filter (README "Video and audio processing"); TANGO_AUDIO_FILTER=1: the audio filter alone (any core).
 # TANGO_VIDEO_DDR3=1 (with TANGO_VIDEO_ASCAL=1; not with TANGO_ASCAL_EXT, TANGO_DBG): ascal's frames
@@ -158,7 +161,8 @@ if [ "${TANGO_VIDEO_ASCAL:-0}" = 1 ]; then
     # TANGO_SDRAM; no clk_sdram), nor with TANGO_VIDEO_DDR3 unless TANGO_NES_SDRAM (ports A/B)
     if [ "${TANGO_ASCAL_EXT:-0}" != 1 ] && { [ $DDR3 = 0 ] || [ "${TANGO_NES_SDRAM:-0}" = 1 ]; }; then
     cat "$BRD/tango_console138k_sdram.cst" >> "$CST"   # SDRAM pin constraints (same as TANGO_SDRAM)
-    # clk_sdram SDC: create_clock 162 MHz + set_clock_groups (debug builds prefix nets with u/)
+    # clk_sdram SDC: create_clock 120 MHz (8.333 ns, an overconstraint: the PLL runs at 96 MHz) + set_clock_groups
+    # (debug builds prefix nets with u/); its "--relax clk_sdram:96.0" comment is passed to sta_gate.py below
     if [ -n "$DBGSFX" ]; then sed 's#get_nets {#get_nets {u/#g' "$BRD/tango_console138k_sdram108.sdc" >> "$SDC"
     else cat "$BRD/tango_console138k_sdram108.sdc" >> "$SDC"; fi
     fi
@@ -170,6 +174,10 @@ fi
 if [ "${TANGO_VIDEO_ROTATE:-0}" = 1 ]; then   # the DDR3-direct rotation client (sys/tango_video_rotate_ddr3.v, README "Rotation")
     [ "$DDR3" = 1 ] || { echo "build_core.sh: TANGO_VIDEO_ROTATE=1 needs TANGO_VIDEO_DDR3=1 (the rotation client writes its frames through tango_ddr3's C0 port)"; exit 2; }
     printf '`define TANGO_VIDEO_ROTATE\n`define TANGO_DDRAM\n' >> "$DEFS"
+fi
+if [ "${TANGO_VIDEO_NO_ROTATE:-0}" = 1 ]; then   # the core's VIDEO_NO_ROTATE output (sys/tango_cfg.vh)
+    [ "${TANGO_VIDEO_ROTATE:-0}" = 1 ] || { echo "build_core.sh: TANGO_VIDEO_NO_ROTATE=1 needs TANGO_VIDEO_ROTATE=1 (sys/tango_cfg.vh)"; exit 2; }
+    printf '`define TANGO_VIDEO_NO_ROTATE\n' >> "$DEFS"
 fi
 VPROC=0; AFILT=0
 if [ "${TANGO_VIDEO_PROC:-0}" = 1 ]; then   # MiSTer's video + audio processing (README "Video and audio processing")

@@ -222,14 +222,41 @@ module tango_vproc_regs (
     reg  [2:0]  w_t = 3'd0;                  // writes done for the first slot (0-3 taps), 4 = the further slots
     reg  [FRAC:0]   w_s = 0;                 // further slots done
     // which slots a phase fills: k <= FRAC: slots ph * 2^(FRAC-k) .. +2^(FRAC-k)-1; k > FRAC: slot ph >> (k-FRAC)
-    // if the low bits are 0 (FRAC 8: k <= 8 always, every phase kept)
-    wire        k_le  = (c_k <= FRAC);
-    wire [3:0]  sh_up = FRAC - c_k;          // k <= FRAC
-    wire [3:0]  sh_dn = c_k - FRAC;          // k > FRAC
-    wire [8:0]  lowmask = (9'd1 << sh_dn) - 9'd1;
-    wire        keep  = k_le || ((c_ph & lowmask) == 9'd0);
-    wire [8:0]  slot0 = k_le ? (c_ph << sh_up) : (c_ph >> sh_dn);
-    wire [FRAC:0] nslot = k_le ? ({{FRAC{1'b0}}, 1'b1} << sh_up) : 1;
+    // if the low bits are 0 (FRAC 8: k <= 8 always, every phase kept).  cdec(k, ph) = {phase in range, phase kept
+    // and its first slot exists, first slot, slots it fills}.
+    localparam integer CDW = 2 + FRAC + FRAC + 1;
+    function automatic [CDW-1:0] cdec(input [3:0] k, input [8:0] ph);
+        reg        k_le;
+        reg [3:0]  sh_up, sh_dn;
+        reg [8:0]  lowmask, slot0;
+        reg        keep;
+        reg [FRAC:0] nslot;
+        begin
+            k_le    = (k <= FRAC);
+            sh_up   = FRAC - k;                  // k <= FRAC
+            sh_dn   = k - FRAC;                  // k > FRAC
+            lowmask = (9'd1 << sh_dn) - 9'd1;
+            keep    = k_le || ((ph & lowmask) == 9'd0);
+            slot0   = k_le ? (ph << sh_up) : (ph >> sh_dn);
+            nslot   = k_le ? ({{FRAC{1'b0}}, 1'b1} << sh_up) : 1;
+            cdec    = {(!ph[8] && (ph < (9'd1 << k))), (keep && (slot0 < (9'd1 << FRAC))), slot0[FRAC-1:0], nslot};
+        end
+    endfunction
+    // cdec(c_k, c_ph) as a register (timing: c_k -> the shifts and compares -> the phase's
+    // load enable (62 loads) -> the writer was an 11-LUT clk_pix path that failed by 0.74 ns in one Galaga draw).  It
+    // is updated with c_k and c_ph themselves: its next value is chosen, by the same conditions that update them,
+    // among cdec of their next values, each computed from registers (b, c_k, c_ph), so it equals cdec(c_k, c_ph)
+    // every clock (checked in simulation) and the decode below reads its fields from a register.
+    reg  [CDW-1:0] cd_q = {1'b1, 1'b1, {FRAC{1'b0}}, ({{FRAC{1'b0}}, 1'b1} << (FRAC - 4))};   // cdec(4, 0)
+    wire        cd_ok    = cd_q[CDW-1];
+    wire        cd_kgo   = cd_q[CDW-2];
+    wire [FRAC-1:0] cd_slot  = cd_q[FRAC+FRAC:FRAC+1];
+    wire [FRAC:0]   cd_nslot = cd_q[FRAC:0];
+    wire [3:0]  ck_b  = (b > 8'd8) ? 4'd8 : b[3:0];           // c_k from this byte (n1)
+    wire [CDW-1:0] cd_kb  /* synthesis syn_keep = 1 */ = cdec(ck_b, c_ph);
+    wire [CDW-1:0] cd_kb0 /* synthesis syn_keep = 1 */ = cdec(ck_b, 9'd0);
+    wire [CDW-1:0] cd_p1  /* synthesis syn_keep = 1 */ = cdec(c_k, c_ph + 9'd1);
+    wire [CDW-1:0] cd_0   /* synthesis syn_keep = 1 */ = cdec(c_k, 9'd0);
     function [9:0] tap_of(input [39:0] t, input [1:0] i);
         tap_of = t[39 - 10 * i -: 10];
     endfunction
@@ -291,7 +318,7 @@ module tango_vproc_regs (
             C_FLTCOEF: begin
                 if (n_is0) c_set <= b[1:0];
                 else if (n_is1) c_k <= (b > 8'd8) ? 4'd8 : b[3:0];
-                else if (!c_ph[8] && (c_ph < (9'd1 << c_k))) begin
+                else if (cd_ok) begin                           // c_ph < 2^c_k
                     if (!c_hi) begin c_th <= b[1:0]; c_hi <= 1'b1; end
                     else begin
                         c_hi <= 1'b0;
@@ -299,8 +326,8 @@ module tango_vproc_regs (
                         c_tap <= c_tap + 2'd1;
                         if (c_tap == 2'd3) begin                 // the phase is complete: hand it to the writer
                             c_ph <= c_ph + 9'd1;
-                            if (keep && slot0 < (9'd1 << FRAC)) begin
-                                w_go <= 1'b1; w_set <= c_set; w_slot <= slot0[FRAC-1:0]; w_cnt <= nslot;
+                            if (cd_kgo) begin
+                                w_go <= 1'b1; w_set <= c_set; w_slot <= cd_slot; w_cnt <= cd_nslot;
                                 w_taps <= {c_taps[39:10], c_th, b}; w_t <= 3'd0; w_s <= 1;
                             end
                         end
@@ -312,6 +339,14 @@ module tango_vproc_regs (
             endcase
         end
 `ifdef TANGO_VIDEO_PROC
+        // cd_q follows c_k / c_ph: the stb branch above (n1 loads c_k; a completed phase advances c_ph) wins over the
+        // command byte's c_ph <= 0, as the assignments above do
+        if (stb && cur == C_FLTCOEF && !n_is0 && n_is1)
+            cd_q <= (cmd_stb && cmdv == C_FLTCOEF) ? cd_kb0 : cd_kb;
+        else if (stb && cur == C_FLTCOEF && !n_is0 && !n_is1 && cd_ok && c_hi && c_tap == 2'd3)
+            cd_q <= cd_p1;
+        else if (cmd_stb && cmdv == C_FLTCOEF)
+            cd_q <= cd_0;
         // the writer: one poly_wr per clock (a phase's 8 bytes take >= 8 x 8 SCK periods, or 8 x 64 clocks from the
         // preset; the longest job, 4 + 255 writes at FRAC 8, takes 259 clocks)
         poly_wr <= 1'b0;
@@ -337,5 +372,20 @@ module tango_vproc_regs (
             a_att <= 5'd0; a_open <= 1'b0; a_rst <= 1'b0;
         end
     end
+`ifdef TANGO_VIDEO_PROC
+    // cd_q equals cdec(c_k, c_ph) every clock.  Simulation only (translate_off, as tango_ddr3_arb.v's contract checks).
+    /* synthesis translate_off */
+    integer cdc_clocks = 0;
+    always @(posedge clk) begin
+        if (cd_q !== cdec(c_k, c_ph)) begin
+            $display("TANGO CONTRACT: vproc cd_q differs at %0t (%m): cd_q %h, cdec(%0d, %0d) %h", $time, cd_q, c_k, c_ph, cdec(c_k, c_ph));
+            $fatal(1, "TANGO CONTRACT: vproc cd_q violated (see the line above)");
+        end
+        cdc_clocks <= cdc_clocks + 1;
+    end
+    final
+        $display("TANGO CONTRACT OK: vproc cd_q = cdec(c_k, c_ph) in %0d clocks (%m)", cdc_clocks);
+    /* synthesis translate_on */
+`endif
 endmodule
 `default_nettype wire

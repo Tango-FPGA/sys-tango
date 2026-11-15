@@ -6,11 +6,18 @@
 // head is empty or being popped, so a word written at clock t is at the head at t + 2 at the earliest.
 // count = words held (memory + head); full when count = 2^AW.  Write only when !full.  The memory's word count and
 // "not empty" are registers (timing, below).
+// WALL = 1: the memory entry at the write pointer is written with wd EVERY clock, we or not; we only advances the
+// pointer and the count (timing: in the V port's command FIFO the late write enable reached
+// each entry's 37 enables through a pointer decode, two long hops).  The entry at wp is always free: the entries
+// rp .. wp-1 hold the words, and with !full at every write there are at most 2^AW - 1 of them whenever a clock writes
+// (checked in simulation); an entry is read only into q, by a load, while it is counted.  So q, count and every
+// output are unchanged; only free entries hold other values.
 //==============================================================================
 `default_nettype none
 module tango_ddr3_fifo #(
     parameter integer W  = 32,
-    parameter integer AW = 4
+    parameter integer AW = 4,
+    parameter integer WALL = 0
 ) (
     input  wire          clk,
     input  wire          rst,
@@ -40,7 +47,7 @@ module tango_ddr3_fifo #(
     wire        ne0 /* synthesis syn_keep = 1 */ = we || ne;                            // n0 != 0
     wire        ne1 /* synthesis syn_keep = 1 */ = (inmem > 1) || (ne && we);           // n1 != 0
     always @(posedge clk) begin
-        if (we) mem[wp[AW-1:0]] <= wd;
+        if (we || WALL != 0) mem[wp[AW-1:0]] <= wd;
         if (load) q <= mem[rp[AW-1:0]];
         if (rst) begin wp <= 0; rp <= 0; inmem <= 0; ne <= 1'b0; q_valid <= 1'b0; end
         else begin
@@ -51,6 +58,14 @@ module tango_ddr3_fifo #(
             ne    <= load ? ne1 : ne0;
         end
     end
+    // WALL: the entry at wp never holds a word (inmem < 2^AW).  Simulation only (translate_off, as tango_ddr3_arb.v's
+    // contract checks).
+    /* synthesis translate_off */
+    always @(posedge clk) if (WALL != 0 && !rst && inmem >= (1 << AW)) begin
+        $display("TANGO CONTRACT: DDR3 fifo entry at the write pointer holds a word at %0t (%m): inmem %0d", $time, inmem);
+        $fatal(1, "TANGO CONTRACT: DDR3 fifo WALL violated (see the line above)");
+    end
+    /* synthesis translate_on */
 endmodule
 `default_nettype wire
 //==============================================================================
@@ -65,6 +80,13 @@ endmodule
 //   n = 2   a pop brings the second word (out_wo), else the head stays
 // so it depends on the late out_pop only in a last 2:1 select, and not on rp, wp or the push at all.  (Empty, out_wb
 // is not meant to follow anything.)  It equals out_data[WB] every clock the queue is not empty (checked in simulation).
+// out_valid is a register too (= n != 0, from the same next count as in_ready), so the consumer's grant starts at a
+// register instead of a decode of n.
+// The entries' write enables (timing): push && wp was one net enabling all W bits of an entry
+// (313 loads in the arbiter's queues).  The entries are written in lanes of 32 bits; lane k's enables read lane k's
+// own copy of the write pointer (wp_l[k], syn_preserve: GowinSynthesis merges identical LUTs),
+// so no two lanes share an enable net.  Every copy is toggled by the same push as wp and equals it every clock
+// (checked in simulation); what each entry holds is unchanged.
 //==============================================================================
 `default_nettype none
 module tango_ddr3_skid #(
@@ -75,36 +97,54 @@ module tango_ddr3_skid #(
     input  wire          rst,
     input  wire          in_valid,
     input  wire [W-1:0]  in_data,
-    output reg           in_ready = 1'b1,
+    output reg           in_ready = 1'b1,         // to the producer only (the queue's own push uses in_ready_w)
     output wire          out_valid,
     output wire [W-1:0]  out_data,
     output reg           out_wb = 1'b0,           // = out_data[WB] when out_valid, a register
     input  wire          out_pop
 );
+    localparam integer NL = (W + 31) / 32;         // write lanes: lane k is bits [32k +: 32] (the last may be shorter)
     reg [W-1:0] e0 = {W{1'b0}}, e1 = {W{1'b0}};
-    reg         rp = 1'b0, wp = 1'b0;
+    reg         rp = 1'b0;
+    (* syn_preserve = 1 *) reg [NL-1:0] wp_l = {NL{1'b0}};   // the write pointer, one copy per lane
     reg [1:0]   n = 2'd0;
-    wire        push = in_valid && in_ready;
+    reg         ov = 1'b0;                          // = n != 0, a register
+    // in_ready's copy for the queue's own push (the lanes' enables, the count): the producer's in_ready is a net to
+    // the producer alone (timing); both equal every clock (checked in simulation)
+    (* syn_preserve = 1 *) reg in_ready_w = 1'b1;
+    wire        push = in_valid && in_ready_w;
     wire [2:0]  nn = {1'b0, n} + (push ? 3'd1 : 3'd0) - (out_pop ? 3'd1 : 3'd0);
-    assign out_valid = (n != 2'd0);
+    assign out_valid = ov;
     assign out_data  = rp ? e1 : e0;
+    genvar gl;
+    generate for (gl = 0; gl < NL; gl = gl + 1) begin : g_lane
+        localparam integer LO = 32 * gl;
+        localparam integer LW = (W - LO < 32) ? (W - LO) : 32;
+        always @(posedge clk) begin
+            if (in_valid && in_ready_w && !wp_l[gl]) e0[LO +: LW] <= in_data[LO +: LW];
+            if (in_valid && in_ready_w &&  wp_l[gl]) e1[LO +: LW] <= in_data[LO +: LW];
+            if (rst) wp_l[gl] <= 1'b0;
+            else if (in_valid && in_ready_w) wp_l[gl] <= ~wp_l[gl];
+        end
+    end endgenerate
     reg out_wo = 1'b0;                              // the second word's flag (n = 2), set when it is pushed
     wire wb_pop  /* synthesis syn_keep = 1 */ = (n == 2'd2) ? out_wo : in_data[WB];   // after a pop
     wire wb_stay /* synthesis syn_keep = 1 */ = (n == 2'd0) ? in_data[WB] : out_wb;   // after no pop
     always @(posedge clk) begin
         out_wb <= out_pop ? wb_pop : wb_stay;
         if (n == 2'd1) out_wo <= in_data[WB];   // the second word's push (else a value nobody reads: out_wo is read only with n = 2, set from n = 1)
-        if (push) begin if (wp) e1 <= in_data; else e0 <= in_data; end
-        if (rst) begin rp <= 1'b0; wp <= 1'b0; n <= 2'd0; in_ready <= 1'b1; end
+        if (rst) begin rp <= 1'b0; n <= 2'd0; ov <= 1'b0; in_ready <= 1'b1; in_ready_w <= 1'b1; end
         else begin
-            if (push) wp <= ~wp;
             if (out_pop) rp <= ~rp;
             n <= nn[1:0];
+            ov <= (nn[1:0] != 2'd0);
             in_ready <= (nn <= 3'd1);
+            in_ready_w <= (nn <= 3'd1);
         end
     end
-    // The registered flag equals the entry the head shows, every clock the queue holds a word.  Simulation only (translate_off, as the
-    // arbiter's contract checks).
+    // The registered flag equals the entry the head shows, every clock the queue holds a word; out_valid equals n != 0
+    // and the lanes' write pointers are equal, every clock.  Simulation only (translate_off, as the arbiter's contract
+    // checks).
     /* synthesis translate_off */
     integer wbc_clocks = 0;
     always @(posedge clk) begin
@@ -112,10 +152,14 @@ module tango_ddr3_skid #(
             $display("TANGO CONTRACT: DDR3 skid out_wb differs at %0t (%m): out_wb %b, out_data[WB] %b", $time, out_wb, out_data[WB]);
             $fatal(1, "TANGO CONTRACT: DDR3 skid out_wb violated (see the line above)");
         end
+        if (ov !== (n != 2'd0) || wp_l !== {NL{wp_l[0]}} || in_ready_w !== in_ready) begin
+            $display("TANGO CONTRACT: DDR3 skid copies differ at %0t (%m): ov %b n %0d wp_l %b in_ready %b/%b", $time, ov, n, wp_l, in_ready, in_ready_w);
+            $fatal(1, "TANGO CONTRACT: DDR3 skid out_valid / write-pointer copies violated (see the line above)");
+        end
         wbc_clocks <= wbc_clocks + 1;
     end
     final
-        $display("TANGO CONTRACT OK: DDR3 skid out_wb equal to out_data[WB] in %0d clocks (%m)", wbc_clocks);
+        $display("TANGO CONTRACT OK: DDR3 skid out_wb equal to out_data[WB], out_valid and %0d write-pointer copies in %0d clocks (%m)", NL, wbc_clocks);
     /* synthesis translate_on */
 endmodule
 `default_nettype wire

@@ -76,7 +76,11 @@ module tango_ddr3 #(
     (* syn_preserve = 1 *) reg rst_v = 1'b1;
     (* syn_preserve = 1 *) reg rst_c = 1'b1;
     (* syn_preserve = 1 *) reg rst_a = 1'b1;
-    always @(posedge clk) begin rst_v <= rst; rst_c <= rst; rst_a <= rst; end
+    // and one for each of the arbiter's queues, placed beside it (timing: rst_a reached the
+    // V queue's lane copies with a 10.4 ns route, 135 loads); all equal to rst_a every clock
+    (* syn_preserve = 1 *) reg rst_qv = 1'b1;
+    (* syn_preserve = 1 *) reg rst_qc = 1'b1;
+    always @(posedge clk) begin rst_v <= rst; rst_c <= rst; rst_a <= rst; rst_qv <= rst; rst_qc <= rst; end
     tango_ddr3_vport u_v (
         .clk(clk), .rst(rst_v),
         .avl_address(avl_address), .avl_burstcount(avl_burstcount), .avl_write(avl_write),
@@ -100,7 +104,7 @@ module tango_ddr3 #(
     assign DDRAM_BUSY = 1'b1; assign DDRAM_DOUT = 64'd0; assign DDRAM_DOUT_READY = 1'b0;
 `endif
     tango_ddr3_arb #(.NC(1), .G(G), .Q_CORE(Q_CORE)) u_arb (
-        .clk(clk), .rst(rst_a),
+        .clk(clk), .rst(rst_a), .rst_qv(rst_qv), .rst_qc(rst_qc),
         .v_valid(v_valid), .v_write(v_write), .v_addr(v_addr), .v_wdata(v_wdata), .v_wmask(v_wmask), .v_ready(v_ready),
         .c_valid(c_valid), .c_write(c_write), .c_addr(c_addr), .c_wdata(c_wdata), .c_wmask(c_wmask), .c_ready(c_ready),
         .r_valid(r_valid), .r_data(r_data),

@@ -125,7 +125,7 @@ module tango_ddr3_vport #(
     end endgenerate
     // the command FIFO: {write, address[27:0], burstcount[7:0]}
     wire [36:0] cq_q;  wire cq_v;  wire cq_pop;
-    tango_ddr3_fifo #(.W(37), .AW(CQ_LOG2)) u_cq (.clk(clk), .rst(rst), .we(take_cmd),
+    tango_ddr3_fifo #(.W(37), .AW(CQ_LOG2), .WALL(1)) u_cq (.clk(clk), .rst(rst), .we(take_cmd),
         .wd({avl_write, avl_address, avl_burstcount}), .count(cq_n), .full(cq_full), .q(cq_q), .q_valid(cq_v), .pop(cq_pop));
     wire [287:0] wq_q;  wire wq_v;  wire wq_pop;
     tango_ddr3_fifo #(.W(288), .AW(WQ_LOG2)) u_wq (.clk(clk), .rst(rst), .we(wq_we), .wd(wq_wd), .count(wq_n),
@@ -174,6 +174,24 @@ module tango_ddr3_vport #(
     wire one     = sa[0] || sn_one;                          // this IP word holds one beat
     assign wq_pop = w_go;
     assign cq_pop = cq_v && !sn_nz;
+    // The request's data enables (q_wdata / q_wmask / q_addr, ~320 registers) take their go from their own copies of
+    // q_valid and sn_nz (timing: w_go was one net of 292-335 loads, the data registers and the
+    // splitter's control together, and its slow routes reached sa).  The copies are syn_preserve registers (GowinSynthesis
+    // merges identical LUTs), each updated as its original but from the data side's own go,
+    // and equal to it every clock (checked below in simulation); w_go / r_go keep the control registers and wq_pop.
+    (* syn_preserve = 1 *) reg q_valid_d = 1'b0;
+    (* syn_preserve = 1 *) reg sn_nz_d = 1'b0;
+    wire q_free_d = !q_valid_d || q_ready;
+    wire w_go_d   = q_free_d && sn_nz_d && sp_w && wq_v;
+    wire r_go_d   = q_free_d && sn_nz_d && !sp_w && rb_ok && ri_ok;
+    always @(posedge clk) begin
+        if (rst) begin q_valid_d <= 1'b0; sn_nz_d <= 1'b0; end
+        else begin
+            if (q_free_d) q_valid_d <= w_go_d || r_go_d;
+            if (w_go_d || r_go_d) sn_nz_d <= one ? (sn_m1 != 9'd0) : (sn_m2 != 9'd0);
+            else if (cq_v && !sn_nz_d) sn_nz_d <= (cq_q[7:0] != 8'd0);
+        end
+    end
     always @(posedge clk) begin
         ri_we <= 1'b0;
         if (rst) begin sn <= 9'd0; sn_nz <= 1'b0; sn_one <= 1'b0; q_valid <= 1'b0; rb_out <= 0; end
@@ -200,11 +218,25 @@ module tango_ddr3_vport #(
 
     // the request's data path: no reset (q_valid qualifies it), so the reset does not gate 300 enables (timing)
     always @(posedge clk) begin
-        if (w_go) begin
+        if (w_go_d) begin
             q_addr <= {1'b0, sa[25:1], 3'b000}; q_wdata <= wq_q[255:0];
             q_wmask <= win(sa) ? wq_q[287:256] : 32'hFFFF_FFFF;
-        end else if (r_go) q_addr <= {1'b0, sa[25:1], 3'b000};
+        end else if (r_go_d) q_addr <= {1'b0, sa[25:1], 3'b000};
     end
+    // The data side's copies equal the originals every clock (so w_go_d / r_go_d equal w_go / r_go).  Simulation only
+    // (translate_off, as the arbiter's contract checks): "TANGO CONTRACT: DDR3 vport ..." and $fatal on a difference.
+    /* synthesis translate_off */
+    integer vpc_clocks = 0;
+    always @(posedge clk) begin
+        if (q_valid_d !== q_valid || sn_nz_d !== sn_nz) begin
+            $display("TANGO CONTRACT: DDR3 vport data-side copies differ at %0t (%m): q_valid %b/%b sn_nz %b/%b", $time, q_valid, q_valid_d, sn_nz, sn_nz_d);
+            $fatal(1, "TANGO CONTRACT: DDR3 vport data-side copies violated (see the line above)");
+        end
+        vpc_clocks <= vpc_clocks + 1;
+    end
+    final
+        $display("TANGO CONTRACT OK: DDR3 vport data-side copies (q_valid, sn_nz) in %0d clocks (%m)", vpc_clocks);
+    /* synthesis translate_on */
 
     // ================= the return buffer: words in, beats out (one a clock) =================
     wire [257:0] rb_q;  wire rb_v;

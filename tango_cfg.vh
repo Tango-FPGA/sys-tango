@@ -112,6 +112,20 @@ tango_video_rotate_needs_TANGO_VIDEO_ASCAL
 `endif
 `endif
 
+// TANGO_VIDEO_NO_ROTATE (with TANGO_VIDEO_ROTATE): the core gets one more output, VIDEO_NO_ROTATE (CLK_SYS,
+// quasi-static; tango_core_ports.vh), for a game that is landscape on a core whose other games are portrait (MiSTer's
+// `landscape`, e.g. Arcade-Scramble.sv 294, 647).  While it is high: the rotation client gets rotate_mode Normal
+// whatever status[119:118] holds (the saved setting itself is not changed), and the framework's Rotation entry is
+// hidden: the entry carries the prefix H<TANGO_VO_MM_NOROT> (tango_video_opts.vh) and tango_sys.v puts
+// VIDEO_NO_ROTATE on that bit of the menumask, in place of the core's own status_menumask bit.  The core's other 15
+// menumask bits pass through unchanged.  build_core.sh TANGO_VIDEO_NO_ROTATE=1; sims +define+TANGO_VIDEO_NO_ROTATE.
+// Not defined: no port, no prefix; the build is as before.
+`ifdef TANGO_VIDEO_NO_ROTATE
+`ifndef TANGO_VIDEO_ROTATE
+tango_video_no_rotate_needs_TANGO_VIDEO_ROTATE
+`endif
+`endif
+
 // TANGO_NES_SDRAM: expose tango_sdram's NES-compatible port A (PPU/CHR) and port B (CPU/ROM) to the
 // core via tango_core_ports.vh.  Use with TANGO_VIDEO_ASCAL; mutually exclusive with TANGO_SDRAM.
 // Port interface is identical to sdram_nes.v (addrA/B, oeA/B, weA/B, dinA/B, doutA/B, clkref, busy).

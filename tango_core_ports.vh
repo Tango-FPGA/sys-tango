@@ -15,6 +15,14 @@ input  wire [31:0]  joystick_0,     // USB-A2 pad: 0 R, 1 L, 2 D, 3 U, 4 A, 5 B,
 input  wire [31:0]  joystick_1,     // USB-A1 pad
 input  wire [127:0] status,         // the option word (CONF_STR O/T/R bits); status[0] = soft reset
 output wire [15:0]  status_menumask,// H/D prefixes of the CONF_STR test these bits
+`ifdef TANGO_VIDEO_NO_ROTATE
+// TANGO_VIDEO_NO_ROTATE (tango_cfg.vh; with TANGO_VIDEO_ROTATE): high = the current game is landscape (MiSTer's
+// `landscape`, Arcade-Scramble.sv 294, 647).  While high the framework shows the picture unrotated whatever the
+// Rotation setting (status[119:118] keeps its value) and hides the Rotation entry.  The entry is hidden through
+// menumask bit `TANGO_VO_MM_NOROT (15): in this build that bit is the framework's and the core's own
+// status_menumask[15] is not used.  Quasi-static (set when a game is chosen); any change is carried across clocks.
+output wire         VIDEO_NO_ROTATE,
+`endif
 input  wire         ioctl_download, // a file is being sent (F entry)
 input  wire [15:0]  ioctl_index,    // which: F digit or menu position + extension index * 64
 input  wire         ioctl_wr,       // one pulse per byte
@@ -69,9 +77,10 @@ output wire [23:0]  VIDEO_PAL_D,
 //      VIDEO OPTIONS (opt in: build option TANGO_VIDEO_OPTS, sys/tango_video_opts.vh): the framework owns Aspect ratio
 //      (status[127:126]), Scale (status[125:124]; arcade TANGO_VIDEO_ROTATE builds: Normal / V-Integer only, MiSTer
 //      arcade parity, sys/tango_video_opts.vh) and Scanlines (status[123:122]), entries from `TANGO_VIDEO_CONF /
-//      `TANGO_VIDEO_CONF_P("P1") in the CONF_STR; status[121:118] stays reserved (a future Filter entry, then
-//      Rotation, TANGO_VO_B_ROTATE, in TANGO_VIDEO_ROTATE builds). The core then outputs its NATIVE shape on VIDEO_ARX/ARY
-//      (what the menu calls "Original", e.g. NES 64:49), ties VIDEO_SCALE and VGA_SL to 0 (sys does not use them; the
+//      `TANGO_VIDEO_CONF_P("P1") in the CONF_STR; status[121:120] stays reserved (a future Filter entry) and
+//      status[119:118] is Rotation in TANGO_VIDEO_ROTATE builds (TANGO_VO_B_ROTATE; a landscape
+//      game forces it off with VIDEO_NO_ROTATE, TANGO_VIDEO_NO_ROTATE above). The core then outputs its NATIVE shape
+//      on VIDEO_ARX/ARY (what the menu calls "Original", e.g. NES 64:49), ties VIDEO_SCALE and VGA_SL to 0 (sys does not use them; the
 //      sims stop with "TANGO CONTRACT: VIDEO_OPTS ..." otherwise) and reads none of status[127:118].  Without the
 //      option the core drives all four itself, as before.
 output wire         CLK_VIDEO,

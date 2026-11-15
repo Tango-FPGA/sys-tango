@@ -142,9 +142,26 @@ module tango_ddr3_cport #(
     reg  [255:0] acc_d = 0;
     reg  [31:0]  acc_m = 32'hFFFF_FFFF;
     reg  [2:0]   acc_n = 3'd0;
+    integer      ab;                                            // lane loop index (acc_m)
     reg  [1:0]   fl = 2'd0;                                     // the lane the next beat fills (a register)
     // acc_n <= nb always (a beat is taken only while acc_n < nb), so acc_n < nb is !acc_full
     assign pop_b = wact && !acc_full && (skn != 0);
+    // The word's four 64-bit lanes (acc_d, acc_m) take their beat enables from their own copies of wact, acc_full,
+    // skn, fl and acc_n == 0 (timing: pop_b fanned out to 55 loads and its lane decode to 48
+    // more, two hops of 3.8-3.9 ns into acc_d's enables failed clk_x1 by 0.19 ns in a multi-game Scramble draw).  The
+    // copies are syn_preserve registers (GowinSynthesis merges identical LUTs), each updated
+    // as its original from its lane's own pop and the data side's go, and equal to it every clock (checked below in
+    // simulation); pop_b keeps the beat skid, the counts and the beat FIFO's read.
+    (* syn_preserve = 1 *) reg [3:0] bw_l  = 4'b0000;        // wact, per lane
+    (* syn_preserve = 1 *) reg [3:0] bf_l  = 4'b1111;        // acc_full, per lane
+    (* syn_preserve = 1 *) reg [7:0] bs_l  = 8'd0;           // skn, per lane at [2k +: 2]
+    (* syn_preserve = 1 *) reg [7:0] bfl_l = 8'd0;           // fl, per lane at [2k +: 2]
+    (* syn_preserve = 1 *) reg [3:0] bz_l  = 4'b1111;        // acc_n == 0, per lane
+    wire [3:0] pb_l;                                         // = pop_b, per lane
+    genvar gb;
+    generate for (gb = 0; gb < 4; gb = gb + 1) begin : g_bl
+        assign pb_l[gb] = bw_l[gb] && !bf_l[gb] && (bs_l[2 * gb +: 2] != 2'd0);
+    end endgenerate
     // reads: the return info in issue order {first lane, last lane}; words reserved in the return FIFO
     reg [3:0]  ri [0:31];
     reg [5:0]  ri_wp = 0, ri_rp = 0;
@@ -157,6 +174,19 @@ module tango_ddr3_cport #(
     wire r_go    = ract && q_free && rf_ok && ri_ok;
     wire w_go    = wact && acc_full && q_free;
     wire go      = r_go || w_go;                                // (never both: ract and wact are exclusive)
+    // The request's data enables (q_wdata / q_wmask / q_addr, ~320 registers) take their go from their own copies of
+    // q_valid, ract, wact and acc_full (timing: w_go enabled both the data registers and,
+    // through go, sa / sn; one slow route on that 242-load net failed clk_x1 by 1.4 ns at sn).  The copies are
+    // syn_preserve registers (GowinSynthesis merges identical LUTs), each updated as its
+    // original but from the data side's own go, and equal to it every clock (checked below in simulation); the control
+    // registers above keep go, w_go and r_go, now a net of ~60 loads.
+    (* syn_preserve = 1 *) reg q_valid_d = 1'b0;
+    (* syn_preserve = 1 *) reg ract_d = 1'b0;
+    (* syn_preserve = 1 *) reg wact_d = 1'b0;
+    (* syn_preserve = 1 *) reg acc_full_d = 1'b1;
+    wire q_free_d = !q_valid_d || q_ready;
+    wire r_go_d   = ract_d && q_free_d && rf_ok && ri_ok;
+    wire w_go_d   = wact_d && acc_full_d && q_free_d;
     // ---- next state after a go, from registers only (the go selects, below).  The IP word just sent took nb beats:
     //      what is left is sn_m; if any is left the command was cut at a 4-lane boundary (nb = 4 - first lane), so the next
     //      word starts at lane 0 and holds min(sn_m, 4) beats -- nbf(sn_m, l0 + nb) with l0 + nb = 0 (checked below).
@@ -175,13 +205,39 @@ module tango_ddr3_cport #(
     wire       ric01 /* synthesis syn_keep = 1 */ = ((ri_wp - (ri_rp + 6'd1)) < 6'd31);
     wire [RF_LOG2+1:0] rfr_g /* synthesis syn_keep = 1 */ = rf_res + 1'b1 - (rf_we ? 1'b1 : 1'b0);
     wire [RF_LOG2+1:0] rfr_n /* synthesis syn_keep = 1 */ = rf_res - (rf_we ? 1'b1 : 1'b0);
+    integer bi;
     always @(posedge clk) begin
         cf_rd <= 1'b0; rf_we <= 1'b0;
         if (rst) begin
             busy <= 1'b0; q_valid <= 1'b0; skn <= 2'd0; rdp <= 1'b0; cf_pend <= 1'b0; acc_n <= 3'd0;
             ri_wp <= 0; ri_rp <= 0; rf_res <= 0; ract <= 1'b0; wact <= 1'b0;
+            q_valid_d <= 1'b0; ract_d <= 1'b0; wact_d <= 1'b0;
+            bw_l <= 4'b0000; bs_l <= 8'd0; bz_l <= 4'b1111;
         end else begin
+            // the lanes' copies, updated as the originals below (cf_pend, the beat, the word's send)
+            for (bi = 0; bi < 4; bi = bi + 1) begin
+                if (cf_pend) begin bz_l[bi] <= 1'b1; bfl_l[2 * bi +: 2] <= lo_c; bw_l[bi] <= cf_q[33] && nz_c; bf_l[bi] <= !nz_c; end
+                case ({pb_l[bi], rdp})
+                    2'b10: bs_l[2 * bi +: 2] <= bs_l[2 * bi +: 2] - 1'b1;
+                    2'b01: bs_l[2 * bi +: 2] <= bs_l[2 * bi +: 2] + 1'b1;
+                    default: ;
+                endcase
+                if (pb_l[bi]) begin
+                    bz_l[bi] <= 1'b0; bfl_l[2 * bi +: 2] <= bfl_l[2 * bi +: 2] + 1'b1;
+                    bf_l[bi] <= ({6'd0, acc_n} + 9'd1 == nb);
+                end
+                if (w_go_d) begin
+                    bz_l[bi] <= 1'b1; bfl_l[2 * bi +: 2] <= sa[1:0] + nb[1:0]; bf_l[bi] <= lastw;
+                    if (lastw) bw_l[bi] <= 1'b0;
+                end
+            end
             if (q_valid && q_ready) q_valid <= 1'b0;
+            // the data side's copies, updated as the originals below, from the data side's go
+            if (q_valid_d && q_ready) q_valid_d <= 1'b0;
+            if (cf_pend) begin ract_d <= !cf_q[33] && nz_c; wact_d <= cf_q[33] && nz_c; acc_full_d <= !nz_c; end
+            if (pop_b) acc_full_d <= ({6'd0, acc_n} + 9'd1 == nb);
+            if (w_go_d) begin q_valid_d <= 1'b1; acc_full_d <= lastw; if (lastw) wact_d <= 1'b0; end
+            if (r_go_d) begin q_valid_d <= 1'b1; if (lastw) ract_d <= 1'b0; end
             // -- the next command
             cf_pend <= cf_rd;
             if (!busy && !cf_rd && !cf_pend && !cf_empty) cf_rd <= 1'b1;
@@ -236,11 +292,18 @@ module tango_ddr3_cport #(
             2'b01: begin if (skn == 2'd0) sk0 <= wf_q; else sk1 <= wf_q; end
             default: ;
         endcase
-        if (cf_pend || w_go) acc_m <= 32'hFFFF_FFFF;
-        else if (pop_b) acc_m[8 * fl +: 8] <= ~sk0[71:64];
-        if (pop_b) acc_d[64 * fl +: 64] <= sk0[63:0];
-        if (w_go) begin q_addr <= {1'b0, 2'b11, sa[24:2], 3'b000}; q_wdata <= acc_d; q_wmask <= acc_m; end
-        else if (r_go) q_addr <= {1'b0, 2'b11, sa[24:2], 3'b000};
+        // the write mask is cleared lazily: a word's first beat (acc_n == 0) writes its own lane and
+        // FF into the other lanes; later beats write their own lane only.  acc_n is 0 after rst, cf_pend and w_go, and every
+        // w_go has acc_n == nb >= 1, so q_wmask <= acc_m loads the same mask as an explicit clear at cf_pend / w_go would.
+        // acc_m's cone is pop_b, acc_n, fl and sk0 (registers only): the late q_ready / w_go is no part of it.
+        // (each lane from its own copies: pb_l = pop_b, bfl_l = fl, bz_l = acc_n == 0)
+        for (ab = 0; ab < 4; ab = ab + 1) begin
+            if (pb_l[ab] && (bfl_l[2 * ab +: 2] == ab[1:0])) acc_m[8 * ab +: 8] <= ~sk0[71:64];
+            else if (pb_l[ab] && bz_l[ab]) acc_m[8 * ab +: 8] <= 8'hFF;
+            if (pb_l[ab] && (bfl_l[2 * ab +: 2] == ab[1:0])) acc_d[64 * ab +: 64] <= sk0[63:0];
+        end
+        if (w_go_d) begin q_addr <= {1'b0, 2'b11, sa[24:2], 3'b000}; q_wdata <= acc_d; q_wmask <= acc_m; end
+        else if (r_go_d) q_addr <= {1'b0, 2'b11, sa[24:2], 3'b000};
         // the return info: the slot at ri_wp is the next free one (ri_ok keeps at most 31 of the 32 held), so it is written
         // EVERY clock with the current word's lanes; ri_wp only moves on r_go, so the slot a read takes is exactly the one
         // written in its r_go clock, and r_go (a late, wide signal) is no part of the 32-way write enable
@@ -266,6 +329,23 @@ module tango_ddr3_cport #(
             $display("TANGO CONTRACT: DDR3 cport next word differs at %0t (%m): sn %0d nb %0d sa[1:0] %0d", $time, sn, nb, sa[1:0]);
             $fatal(1, "TANGO CONTRACT: DDR3 cport next word violated (see the line above)");
         end
+        // the data side's copies equal the control side's registers (so w_go_d / r_go_d equal w_go / r_go)
+        if (q_valid_d !== q_valid || ract_d !== ract || wact_d !== wact || acc_full_d !== acc_full) begin
+            $display("TANGO CONTRACT: DDR3 cport data-side copies differ at %0t (%m): q_valid %b/%b ract %b/%b wact %b/%b acc_full %b/%b",
+                     $time, q_valid, q_valid_d, ract, ract_d, wact, wact_d, acc_full, acc_full_d);
+            $fatal(1, "TANGO CONTRACT: DDR3 cport data-side copies violated (see the line above)");
+        end
+        // the lanes' copies equal the originals
+        if (bw_l !== {4{wact}} || bf_l !== {4{acc_full}} || bs_l !== {4{skn}} || bfl_l !== {4{fl}} || bz_l !== {4{acc_n == 3'd0}}) begin
+            $display("TANGO CONTRACT: DDR3 cport lane copies differ at %0t (%m): wact %b/%b acc_full %b/%b skn %0d/%b fl %0d/%b acc_n %0d/%b",
+                     $time, wact, bw_l, acc_full, bf_l, skn, bs_l, fl, bfl_l, acc_n, bz_l);
+            $fatal(1, "TANGO CONTRACT: DDR3 cport lane copies violated (see the line above)");
+        end
+        // the lazy acc_m clear needs a beat in every word that is sent (acc_m is read only at w_go)
+        if (w_go && acc_n == 3'd0) begin
+            $display("TANGO CONTRACT: DDR3 cport w_go with no beat in the word at %0t (%m): nb %0d", $time, nb);
+            $fatal(1, "TANGO CONTRACT: DDR3 cport lazy mask clear violated (see the line above)");
+        end
         // the return-info ring: at most 31 of 32 slots held (so ri_wp's slot is free to overwrite), a return only for a held one
         if (ri_cnt > 6'd31 || (r_valid && ri_cnt == 6'd0)) begin
             $display("TANGO CONTRACT: DDR3 cport return-info ring at %0t (%m): wp %0d rp %0d r_valid %b", $time, ri_wp, ri_rp, r_valid);
@@ -274,7 +354,7 @@ module tango_ddr3_cport #(
         cpc_clocks <= cpc_clocks + 1;
     end
     final
-        $display("TANGO CONTRACT OK: DDR3 cport flags, next word, return-info ring in %0d clocks (%m)", cpc_clocks);
+        $display("TANGO CONTRACT OK: DDR3 cport flags, data-side copies, lane copies, next word, lazy mask clear, return-info ring in %0d clocks (%m)", cpc_clocks);
     /* synthesis translate_on */
 endmodule
 `default_nettype wire

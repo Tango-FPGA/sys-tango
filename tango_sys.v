@@ -438,10 +438,24 @@ module tango_sys #(
     // here).
     // rotate_mode: status[`TANGO_VO_B_ROTATE] via tango_cdc_word, clk_pix -> clk_video -- not a Verilog
     // constant, which would let synthesis constant-fold the block away.
+`ifdef TANGO_VIDEO_NO_ROTATE
+    // TANGO_VIDEO_NO_ROTATE (tango_cfg.vh): the core's VIDEO_NO_ROTATE (clk_sys) forces Normal after the status CDC;
+    // status[119:118] itself is untouched, so the saved setting comes back when the core drops the bit.
+    wire [1:0]  rotate_mode_st;         // status[119:118] in clk_video
+    wire        no_rotate_v;            // VIDEO_NO_ROTATE in clk_video
+    tango_cdc_word #(.W(2)) u_vrot_cdc (
+        .clk_a(clk_pix), .din(status_l[`TANGO_VO_B_ROTATE]),
+        .clk_b(clk_video), .dout(rotate_mode_st));
+    tango_cdc_word #(.W(1)) u_norot_cdc (
+        .clk_a(clk_sys), .din(video_no_rotate),
+        .clk_b(clk_video), .dout(no_rotate_v));
+    wire [1:0]  rotate_mode_vrot = no_rotate_v ? 2'b00 : rotate_mode_st;
+`else
     wire [1:0]  rotate_mode_vrot;
     tango_cdc_word #(.W(2)) u_vrot_cdc (
         .clk_a(clk_pix), .din(status_l[`TANGO_VO_B_ROTATE]),
         .clk_b(clk_video), .dout(rotate_mode_vrot));
+`endif
 `ifdef TANGO_VIDEO_DDR3
     wire        rot_fb_ena_w, rot_fb_vbl_w;
     wire [11:0] rot_fb_hsize_w, rot_fb_vsize_w;
@@ -788,6 +802,14 @@ module tango_sys #(
     wire [127:0] status_c, status_l;
     wire         status_tog;
     wire [15:0]  menumask_c, menumask_l;
+`ifdef TANGO_VIDEO_NO_ROTATE
+    // the menumask the link reads: the core's, with bit `TANGO_VO_MM_NOROT replaced by VIDEO_NO_ROTATE (it hides the
+    // Rotation entry, prefix `TANGO_VO_H_NOROT); both in clk_sys, so tango_io's menumask CDC carries the result
+    wire [15:0]  menumask_core;
+    wire         video_no_rotate;
+    assign menumask_c = (menumask_core & ~(16'd1 << `TANGO_VO_MM_NOROT))
+                      | ({15'd0, video_no_rotate} << `TANGO_VO_MM_NOROT);
+`endif
     wire         ioctl_download, ioctl_wr, ioctl_wait;
     wire [15:0]  ioctl_index;
     wire [26:0]  ioctl_addr;
@@ -806,7 +828,11 @@ module tango_sys #(
     tango_core u_core (
         .CLK_50M(clk50), .CLK_PIX(clk_pix), .RESET(rst_pix), .CLK_SYS(clk_sys),
         .joystick_0(joystick_0), .joystick_1(joystick_1),
+`ifdef TANGO_VIDEO_NO_ROTATE
+        .status(status_c), .status_menumask(menumask_core), .VIDEO_NO_ROTATE(video_no_rotate),
+`else
         .status(status_c), .status_menumask(menumask_c),
+`endif
         .ioctl_download(ioctl_download), .ioctl_index(ioctl_index), .ioctl_wr(ioctl_wr),
         .ioctl_addr(ioctl_addr), .ioctl_dout(ioctl_dout), .ioctl_wait(ioctl_wait),
         .conf_addr(conf_addr), .conf_char(conf_char),

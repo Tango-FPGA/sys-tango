@@ -1,6 +1,6 @@
 # sys-tango -- the Tango framework
 
-**Version 2026-11-13** (date code `20261113`)
+**Version 2026-11-15** (date code `20261115`)
 
 sys-tango is the framework every Tango core is built on: a MiSTer-style `sys/` for the
 **Sipeed Tang Console 138K**. A core mounts this repository as a git submodule at `sys/` and keeps its own code beside
@@ -153,6 +153,7 @@ A `CONF_STR` may be up to 4095 bytes (12-bit `conf_addr`).
 | `joystick_0`, `joystick_1` [31:0] | in | CLK_SYS | the pads on USB-A2 and USB-A1: bit 0 right, 1 left, 2 down, 3 up, 4 A, 5 B, 6 X, 7 Y, 8 L, 9 R, 10 Select, 11 Start; 0 while the menu is open |
 | `status` [127:0] | in | CLK_SYS | the option word: the `CONF_STR` `O`/`T`/`R` bits; `status[0]` is the soft reset; with `TANGO_VIDEO_OPTS`, `status[127:118]` belongs to the framework |
 | `status_menumask` [15:0] | out | CLK_SYS | the bits the `CONF_STR` `H`/`D` prefixes test |
+| `VIDEO_NO_ROTATE` | out | CLK_SYS | with `TANGO_VIDEO_NO_ROTATE`: high for a landscape game on a rotating core (see [Rotation](#rotation)) |
 | `ioctl_download`, `ioctl_index`, `ioctl_wr`, `ioctl_addr`, `ioctl_dout` | in | CLK_SYS | a file from an `F` entry, one byte per `ioctl_wr` |
 | `ioctl_wait` | out | CLK_SYS | high holds the next byte back; nothing is lost |
 | `ioctl_upload`, `ioctl_rd` / `ioctl_din` | in / out | CLK_SYS | with `TANGO_IOCTL_UPLOAD`: the firmware reads a file back from the core (e.g. NVRAM), MiSTer's upload direction: the framework raises `ioctl_upload`, sets `ioctl_addr` / `ioctl_index` and pulses `ioctl_rd`; the core answers on `ioctl_din` (up to 2048 bytes; `ioctl_upload_req` / `_index` are present but not acted on) |
@@ -194,6 +195,7 @@ build is exactly as it was before the option existed.
 | `TANGO_VIDEO_F1=1` | (with ascal) the core drives `VGA_F1`: ascal detects interlaced video and weaves the fields, as on MiSTer, and the framework's scanlines are off while the input is interlaced |
 | `TANGO_VIDEO_OPTS=1` | (with ascal) the framework's Video page: Aspect ratio, Scale, Scanlines in `status[127:122]`; the framework reserves `status[127:118]` |
 | `TANGO_VIDEO_ROTATE=1` | (with `TANGO_VIDEO_DDR3`; sets `TANGO_DDRAM`) screen rotation for arcade cores: see [Rotation](#rotation) |
+| `TANGO_VIDEO_NO_ROTATE=1` | (with `TANGO_VIDEO_ROTATE`) the core drives `VIDEO_NO_ROTATE` to mark a landscape game: see [Rotation](#rotation) |
 | `TANGO_VIDEO_PROC=1` | (with ascal) MiSTer's video processing: polyphase filters, gamma, shadow mask; implies `TANGO_AUDIO_FILTER` |
 | `TANGO_AUDIO_FILTER=1` | MiSTer's audio filter, boost, stereo mix and global volume (any core) |
 | `TANGO_VSYNC_ADJUST=1` [`TANGO_VSYNC_DEFAULT=0\|1`] | (with ascal and `TANGO_VIDEO_PROC` or `TANGO_AUDIO_FILTER`) native-rate video: see [Native-rate video](#native-rate-video-vsync_adjust) |
@@ -211,6 +213,8 @@ build is exactly as it was before the option existed.
 | `TANGO_ASCAL_SRC=vhdl` | build ascal from `ascal.vhd` with Gowin's VHDL front end instead of the GHDL netlist (not recommended: see [Video](#video)) |
 | `TANGO_EXTRA_CST=<file>` | a core's placement constraints (`INS_LOC` lines only), appended to the board's |
 | `TANGO_SYN_RETIME=1` | Gowin's own retiming, timing-driven synthesis, maximum place-and-route effort and hold fixing (changes no logic) |
+| `TANGO_PNR_EFFORT=1` | timing-driven, maximum-effort place and route with hold fixing, without retiming (the same netlist, placed and routed differently) |
+| `TANGO_PNR_REPLICATE=1` | place and route replicates high-fanout resources (`-replicate_resources`), for nets the RTL cannot restructure |
 | `TANGO_MEM_CAP` | the memory cap of the Gowin job (default `4G`) |
 | `TANGO_VIDEO_FB=1` | an earlier BSRAM frame-buffer path; `tango_video.v` is now the ascal version, so new cores use `TANGO_VIDEO_ASCAL` |
 
@@ -286,6 +290,15 @@ writes each of the core's frames rotated into memory and ascal shows it with its
 
 The option claims the whole core port: a core that also wants `DDRAM_*` traffic of its own is not supported.
 Without the option no rotation logic is built and the `CONF_STR` has no Rotation entry.
+
+**A landscape game on a rotating core** (`TANGO_VIDEO_NO_ROTATE=1`, with `TANGO_VIDEO_ROTATE`). Rotation is one
+setting in the core's `.CFG`, shared by all its `.mra` files, so a core whose games are mostly portrait would show a
+landscape game sideways. As MiSTer's `landscape`, the core then drives `VIDEO_NO_ROTATE` (CLK_SYS, quasi-static) high
+for a landscape game: the picture is shown unrotated whatever `status[119:118]` holds (the saved setting is kept for
+the next portrait game) and the Rotation entry is hidden. The entry carries the prefix `HF` (`` `TANGO_VO_H_NOROT ``),
+and the framework puts `VIDEO_NO_ROTATE` on bit 15 of the menumask the firmware reads (`` `TANGO_VO_MM_NOROT ``), so in
+this build the core's own `status_menumask[15]` is not used; its bits 0-14 pass through. Without the option the core
+has no new port and its `CONF_STR` is unchanged.
 
 ## The DDR3 path
 
