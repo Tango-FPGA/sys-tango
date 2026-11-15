@@ -1,0 +1,89 @@
+ascal_osweep.patch -- a Tango modification of TEMLIB ascal.vhd (NOTICE): the output sweep's two counter compares as
+registers.  Applied by ascal_ghdl/gen.sh (every mode) to a copy of ascal.vhd, which stays byte-identical to MiSTer's.
+In OSWEEP, o_hcpt+1<o_htotal decided the line end, and the line end enables o_hcpt, o_vcpt_sync and the four vertical
+counters (about 60 registers) and resets o_vcpt_pre3 when o_vcpt_pre3+1>=o_vtotal; both compares sat in front of that
+enable (docs/DDR3-FANOUT-FIX.md section 8: 17 LUT levels and a 61-load net on clk_pix).  Now:
+  - o_hlt = o_hcpt+1<o_htotal and o_vlt = o_vcpt_pre3+1<o_vtotal are registers;
+  - each is computed every clock from the next values of its counter and total, exactly as OSWEEP and Scalaire update
+    them: the counter by o_ce, o_hlt, o_vlt and o_vrr_sync2; the total from the htotal / vtotal input, or held while
+    o_reset_na is low (Scalaire's reset branch);
+  - each compare is the sign of a 14-bit difference (total - counter - 2 >= 0), exact for counters and totals in
+    0..4095;
+  - both reset to false, the value of both compares with every register at 0.
+So o_hlt and o_vlt equal the two compares on every clock, and every output is unchanged on every clock.
+Line numbers: ascal.vhd as in this repository.
+
+--- a/ascal.vhd
++++ b/ascal.vhd
+@@ -465,6 +465,8 @@
+ 	SIGNAL o_ldw,o_ldr0,o_ldr1,o_ldr2,o_ldr3 : type_pix;
+ 	SIGNAL o_wr : unsigned(3 DOWNTO 0);
+ 	SIGNAL o_hcpt,o_vcpt,o_vcpt_pre,o_vcpt_pre2,o_vcpt_pre3,o_vcpt2 : uint12;
++	-- Tango: o_hcpt+1<o_htotal and o_vcpt_pre3+1<o_vtotal as registers, from the next values of the counters and totals
++	SIGNAL o_hlt,o_vlt : boolean := false;
+ 	SIGNAL o_ihsize,o_ihsizem,o_ivsize : uint12;
+ 	SIGNAL o_ihsize_temp, o_ihsize_temp2 : natural RANGE 0 TO 32767;
+ 
+@@ -2642,12 +2644,15 @@
+ 	-----------------------------------------------------------------------------
+ 	-- Output video sweep
+ 	OSWEEP:PROCESS(o_clk) IS
++		-- Tango: the next values of o_hcpt, o_vcpt_pre3, o_htotal and o_vtotal (Scalaire holds the totals in reset)
++		VARIABLE hcpt_n_v,vcpt_n_v,htotal_n_v,vtotal_n_v : uint12;
++		VARIABLE hd_v,vd_v : signed(13 DOWNTO 0);
+ 	BEGIN
+ 		IF rising_edge(o_clk) THEN
+ 
+ 			IF o_ce='1' THEN
+ 				-- Output pixels count
+-				IF o_hcpt+1<o_htotal THEN
++				IF o_hlt THEN -- Tango: = o_hcpt+1<o_htotal
+ 					o_hcpt<=(o_hcpt+1) MOD 4096;
+ 				ELSE
+ 					o_hcpt<=0;
+@@ -2656,7 +2661,7 @@
+ 						o_vcpt_sync <= o_vcpt_sync+1;
+ 					END IF;
+ 
+-					IF o_vcpt_pre3+1>=o_vtotal THEN
++					IF NOT o_vlt THEN -- Tango: = o_vcpt_pre3+1>=o_vtotal
+ 						o_vcpt_pre3<=0;
+ 					ELSIF o_vrr_sync2 THEN
+ 						o_vcpt_pre3<=o_vsstart;
+@@ -2713,6 +2718,36 @@
+ 			o_vrr_sync<=(o_vrr='1' AND (o_sync OR o_sync_max) AND o_vcpt2>=o_vdisp AND o_vcpt2<o_vsstart);
+ 			o_vrr_sync2<=o_vrr_sync;
+ 
++			-- Tango: o_hlt and o_vlt, the two compares above, for the next clock: each compare is computed here from
++			-- the next values, as a sign test of a difference, so the line-end enable starts at registers.
++			hcpt_n_v:=o_hcpt;
++			vcpt_n_v:=o_vcpt_pre3;
++			IF o_ce='1' THEN
++				IF o_hlt THEN
++					hcpt_n_v:=(o_hcpt+1) MOD 4096;
++				ELSE
++					hcpt_n_v:=0;
++					IF NOT o_vlt THEN
++						vcpt_n_v:=0;
++					ELSIF o_vrr_sync2 THEN
++						vcpt_n_v:=o_vsstart;
++					ELSE
++						vcpt_n_v:=(o_vcpt_pre3+1) MOD 4096;
++					END IF;
++				END IF;
++			END IF;
++			IF o_reset_na='1' THEN
++				htotal_n_v:=htotal;
++				vtotal_n_v:=vtotal;
++			ELSE
++				htotal_n_v:=o_htotal;
++				vtotal_n_v:=o_vtotal;
++			END IF;
++			hd_v:=to_signed(htotal_n_v,14) - to_signed(hcpt_n_v,14) - 2; -- >= 0 <=> hcpt+1 < htotal
++			vd_v:=to_signed(vtotal_n_v,14) - to_signed(vcpt_n_v,14) - 2; -- >= 0 <=> vcpt_pre3+1 < vtotal
++			o_hlt<=(hd_v(13)='0');
++			o_vlt<=(vd_v(13)='0');
++
+ 	 END IF;
+ 	END PROCESS OSWEEP;
+ 

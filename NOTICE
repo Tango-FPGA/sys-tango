@@ -134,8 +134,13 @@ Files:  ascal.vhd
         ascal_ghdl/ascal_poly_bram.patch   (the Tango authors' modification of ascal.vhd: its polyphase
                                     coefficient memories as synchronous-read RAMs, so they become block
                                     RAM; ascal.vhd itself is unchanged.  Same terms as ascal.vhd)
-        ascal_ghdl/ascal_fixed8.v  (GHDL's translation of ascal.vhd with that patch, FRAC 8: the netlist of the
-                                    TANGO_VIDEO_PROC builds; ascal_ghdl/gen.sh 8 regenerates it; same terms)
+        ascal_ghdl/ascal_osweep.patch   (the Tango authors' modification of ascal.vhd: the output sweep's
+                                    two counter compares as registers computed one clock ahead, the same
+                                    values on every clock; ascal.vhd itself is unchanged.  Same terms as
+                                    ascal.vhd.  gen.sh applies it in every mode, so every netlist listed here is a
+                                    translation of ascal.vhd with it)
+        ascal_ghdl/ascal_fixed8.v  (GHDL's translation of ascal.vhd with the polyphase patch, FRAC 8: the netlist of
+                                    the TANGO_VIDEO_PROC builds; ascal_ghdl/gen.sh 8 regenerates it; same terms)
         ascal_ghdl/ascal_fixed_ddr3.v, ascal_ghdl/ascal_fixed8_ddr3.v   (the same two translations with the
                                     Avalon side of the DDR3 scaler port: the TANGO_VIDEO_DDR3 builds;
                                     ascal_ghdl/gen.sh 4d / 8d regenerate them; same terms)

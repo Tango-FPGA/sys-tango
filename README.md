@@ -1,6 +1,6 @@
 # sys-tango -- the Tango framework
 
-**Version 2026-11-15** (date code `20261115`)
+**Version 2026-11-15** (date code `20261115-2`)
 
 sys-tango is the framework every Tango core is built on: a MiSTer-style `sys/` for the
 **Sipeed Tang Console 138K**. A core mounts this repository as a git submodule at `sys/` and keeps its own code beside
@@ -554,7 +554,7 @@ Gowin's documentation) cited in the file.
 
 | Component | Files | Author | Terms |
 |---|---|---|---|
-| **ascal**, the "Avalon scaler" | `ascal.vhd` (byte-identical to `sys/ascal.vhd` of MiSTer-devel/Genesis_MiSTer at commit `adc0c42`); the GHDL netlists `ascal_ghdl/ascal_fixed*.v` (machine translations); `ascal_ghdl/ascal_poly_bram.patch` (our modification, applied to a copy) | TEMLIB (2018-2020), as carried and extended by the MiSTer project | ascal.vhd's own terms: "freely distributed and used for any purpose"; bugs and enhancements to info@temlib.org |
+| **ascal**, the "Avalon scaler" | `ascal.vhd` (byte-identical to `sys/ascal.vhd` of MiSTer-devel/Genesis_MiSTer at commit `adc0c42`); the GHDL netlists `ascal_ghdl/ascal_fixed*.v` (machine translations); `ascal_ghdl/ascal_poly_bram.patch` and `ascal_ghdl/ascal_osweep.patch` (our modifications, applied by `gen.sh` to a copy) | TEMLIB (2018-2020), as carried and extended by the MiSTer project | ascal.vhd's own terms: "freely distributed and used for any purpose"; bugs and enhancements to info@temlib.org |
 | **hdmi** | `hdmi/*.sv` (modified copies, see `hdmi/README.md`) | Sameer Puri, [hdl-util/hdmi](https://github.com/hdl-util/hdmi) | MIT (`hdmi/LICENSE-MIT`), offered by upstream as MIT or Apache-2.0 |
 | **Gowin `PLL_INIT`** | not in this repository: `IDE/ipcore/PLL_ADV/data/PLL/pll_init.v` of the user's Gowin EDA installation, added to every build by `build_core.sh` (see [Building](#building)) | Gowin Semiconductor Corporation | the licence of the user's Gowin EDA |
 | **Gowin DDR3 Memory Interface IP** | not in this repository: generated into each `TANGO_VIDEO_DDR3` build by `ddr3/tango_ddr3_ip.tcl` | Gowin Semiconductor Corporation | the licence of the user's Gowin EDA |
