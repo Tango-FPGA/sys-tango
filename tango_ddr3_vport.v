@@ -243,7 +243,9 @@ module tango_ddr3_vport #(
     reg  lo_done = 1'b0;
     wire rb_lo  = rb_v && rb_q[257] && !lo_done;             // the low half goes now
     wire rb_pop = rb_v && (rb_lo ? !rb_q[256] : 1'b1);       // the word's last half goes now
-    tango_ddr3_fifo #(.W(258), .AW(RB_LOG2)) u_rb (.clk(clk), .rst(rst), .we(r_valid), .wd({ri_q, r_data}),
+    // FW 2: the flags {lo_en, hi_en} (bits 257:256, read by rb_lo / rb_pop and so by the buffer's own load) are held
+    // in registers, not in the block RAM (timing: tango_ddr3_fifo.v, FW)
+    tango_ddr3_fifo #(.W(258), .AW(RB_LOG2), .FW(2)) u_rb (.clk(clk), .rst(rst), .we(r_valid), .wd({ri_q, r_data}),
         .count(rb_n), .full(), .q(rb_q), .q_valid(rb_v), .pop(rb_pop));
     always @(posedge clk) begin
         avl_readdatavalid <= rb_v && (rb_lo || rb_q[256]);

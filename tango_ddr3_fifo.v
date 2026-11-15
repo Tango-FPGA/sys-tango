@@ -12,12 +12,20 @@
 // rp .. wp-1 hold the words, and with !full at every write there are at most 2^AW - 1 of them whenever a clock writes
 // (checked in simulation); an entry is read only into q, by a load, while it is counted.  So q, count and every
 // output are unchanged; only free entries hold other values.
+// FW > 0: the top FW bits of every word are held in registers instead of the memory (an array of flops, syn_ramstyle
+// "registers", written with the same enable and pointer as the memory), and the head's top FW bits in a register
+// loaded from it with the same load and read pointer (timing: in the V port's
+// return buffer the pop reads the head's two flag bits, and the pop is in the load, the memory's read enable; read
+// from the block RAM's output register, that loop began at a 2 ns clock-to-out and twice crossed the distance
+// between the memory and the pop's logic).  Each entry and the head hold exactly the bits the memory held, so q,
+// count and every output are unchanged.
 //==============================================================================
 `default_nettype none
 module tango_ddr3_fifo #(
     parameter integer W  = 32,
     parameter integer AW = 4,
-    parameter integer WALL = 0
+    parameter integer WALL = 0,
+    parameter integer FW = 0                      // top bits of each word held in registers (0..W-1)
 ) (
     input  wire          clk,
     input  wire          rst,
@@ -25,11 +33,13 @@ module tango_ddr3_fifo #(
     input  wire [W-1:0]  wd,
     output wire [AW:0]   count,
     output wire          full,
-    output reg  [W-1:0]  q = {W{1'b0}},
+    output wire [W-1:0]  q,
     output reg           q_valid = 1'b0,
     input  wire          pop
 );
-    reg [W-1:0]  mem [0:(1<<AW)-1];
+    localparam integer MW = W - FW;                // the bits held in the memory
+    reg [MW-1:0] mem [0:(1<<AW)-1];
+    reg [MW-1:0] qm = {MW{1'b0}};
     reg [AW:0]   wp = 0, rp = 0;
     // the words in the memory, a register, and "not empty", a register (timing: wp - rp -> != 0 -> load -> q_valid
     // failed clk_x1 by 0.215 ns in a Template DDR3 build); both next values are computed for a load and
@@ -47,8 +57,8 @@ module tango_ddr3_fifo #(
     wire        ne0 /* synthesis syn_keep = 1 */ = we || ne;                            // n0 != 0
     wire        ne1 /* synthesis syn_keep = 1 */ = (inmem > 1) || (ne && we);           // n1 != 0
     always @(posedge clk) begin
-        if (we || WALL != 0) mem[wp[AW-1:0]] <= wd;
-        if (load) q <= mem[rp[AW-1:0]];
+        if (we || WALL != 0) mem[wp[AW-1:0]] <= wd[MW-1:0];
+        if (load) qm <= mem[rp[AW-1:0]];
         if (rst) begin wp <= 0; rp <= 0; inmem <= 0; ne <= 1'b0; q_valid <= 1'b0; end
         else begin
             if (we) wp <= wp + 1'b1;
@@ -58,6 +68,17 @@ module tango_ddr3_fifo #(
             ne    <= load ? ne1 : ne0;
         end
     end
+    generate if (FW == 0) begin : g_q
+        assign q = qm;
+    end else begin : g_qf
+        (* syn_ramstyle = "registers" *) reg [FW-1:0] memf [0:(1<<AW)-1];
+        (* syn_preserve = 1 *) reg [FW-1:0] qf = {FW{1'b0}};
+        always @(posedge clk) begin
+            if (we || WALL != 0) memf[wp[AW-1:0]] <= wd[W-1:MW];
+            if (load) qf <= memf[rp[AW-1:0]];
+        end
+        assign q = {qf, qm};
+    end endgenerate
     // WALL: the entry at wp never holds a word (inmem < 2^AW).  Simulation only (translate_off, as tango_ddr3_arb.v's
     // contract checks).
     /* synthesis translate_off */

@@ -1,6 +1,6 @@
 # sys-tango -- the Tango framework
 
-**Version 2026-11-15** (date code `20261115-2`)
+**Version 2026-11-15** (date code `20261115-3`)
 
 sys-tango is the framework every Tango core is built on: a MiSTer-style `sys/` for the
 **Sipeed Tang Console 138K**. A core mounts this repository as a git submodule at `sys/` and keeps its own code beside

@@ -187,6 +187,17 @@ module tango_ddr3_cport #(
     wire q_free_d = !q_valid_d || q_ready;
     wire r_go_d   = ract_d && q_free_d && rf_ok && ri_ok;
     wire w_go_d   = wact_d && acc_full_d && q_free_d;
+    // q_addr's enable (w_go_d || r_go_d) is one more LUT after w_go_d's ~290 loads (timing: a Frogger build failed
+    // clk_x1 by 0.22 ns on q_ready -> w_go_d -> that LUT -> q_addr's CE).  q_addr takes
+    // its go from a third set of syn_preserve copies (q_valid_a, ract_a, wact_a, acc_full_a), updated as the data side's
+    // copies but from q_addr's own go, and equal to the originals every clock (checked below in simulation).
+    (* syn_preserve = 1 *) reg q_valid_a = 1'b0;
+    (* syn_preserve = 1 *) reg ract_a = 1'b0;
+    (* syn_preserve = 1 *) reg wact_a = 1'b0;
+    (* syn_preserve = 1 *) reg acc_full_a = 1'b1;
+    wire q_free_a = !q_valid_a || q_ready;
+    wire r_go_a   = ract_a && q_free_a && rf_ok && ri_ok;
+    wire w_go_a   = wact_a && acc_full_a && q_free_a;
     // ---- next state after a go, from registers only (the go selects, below).  The IP word just sent took nb beats:
     //      what is left is sn_m; if any is left the command was cut at a 4-lane boundary (nb = 4 - first lane), so the next
     //      word starts at lane 0 and holds min(sn_m, 4) beats -- nbf(sn_m, l0 + nb) with l0 + nb = 0 (checked below).
@@ -212,6 +223,7 @@ module tango_ddr3_cport #(
             busy <= 1'b0; q_valid <= 1'b0; skn <= 2'd0; rdp <= 1'b0; cf_pend <= 1'b0; acc_n <= 3'd0;
             ri_wp <= 0; ri_rp <= 0; rf_res <= 0; ract <= 1'b0; wact <= 1'b0;
             q_valid_d <= 1'b0; ract_d <= 1'b0; wact_d <= 1'b0;
+            q_valid_a <= 1'b0; ract_a <= 1'b0; wact_a <= 1'b0;
             bw_l <= 4'b0000; bs_l <= 8'd0; bz_l <= 4'b1111;
         end else begin
             // the lanes' copies, updated as the originals below (cf_pend, the beat, the word's send)
@@ -238,6 +250,12 @@ module tango_ddr3_cport #(
             if (pop_b) acc_full_d <= ({6'd0, acc_n} + 9'd1 == nb);
             if (w_go_d) begin q_valid_d <= 1'b1; acc_full_d <= lastw; if (lastw) wact_d <= 1'b0; end
             if (r_go_d) begin q_valid_d <= 1'b1; if (lastw) ract_d <= 1'b0; end
+            // q_addr's copies, the same updates from q_addr's go
+            if (q_valid_a && q_ready) q_valid_a <= 1'b0;
+            if (cf_pend) begin ract_a <= !cf_q[33] && nz_c; wact_a <= cf_q[33] && nz_c; acc_full_a <= !nz_c; end
+            if (pop_b) acc_full_a <= ({6'd0, acc_n} + 9'd1 == nb);
+            if (w_go_a) begin q_valid_a <= 1'b1; acc_full_a <= lastw; if (lastw) wact_a <= 1'b0; end
+            if (r_go_a) begin q_valid_a <= 1'b1; if (lastw) ract_a <= 1'b0; end
             // -- the next command
             cf_pend <= cf_rd;
             if (!busy && !cf_rd && !cf_pend && !cf_empty) cf_rd <= 1'b1;
@@ -302,8 +320,8 @@ module tango_ddr3_cport #(
             else if (pb_l[ab] && bz_l[ab]) acc_m[8 * ab +: 8] <= 8'hFF;
             if (pb_l[ab] && (bfl_l[2 * ab +: 2] == ab[1:0])) acc_d[64 * ab +: 64] <= sk0[63:0];
         end
-        if (w_go_d) begin q_addr <= {1'b0, 2'b11, sa[24:2], 3'b000}; q_wdata <= acc_d; q_wmask <= acc_m; end
-        else if (r_go_d) q_addr <= {1'b0, 2'b11, sa[24:2], 3'b000};
+        if (w_go_d) begin q_wdata <= acc_d; q_wmask <= acc_m; end
+        if (w_go_a || r_go_a) q_addr <= {1'b0, 2'b11, sa[24:2], 3'b000};
         // the return info: the slot at ri_wp is the next free one (ri_ok keeps at most 31 of the 32 held), so it is written
         // EVERY clock with the current word's lanes; ri_wp only moves on r_go, so the slot a read takes is exactly the one
         // written in its r_go clock, and r_go (a late, wide signal) is no part of the 32-way write enable
@@ -330,9 +348,10 @@ module tango_ddr3_cport #(
             $fatal(1, "TANGO CONTRACT: DDR3 cport next word violated (see the line above)");
         end
         // the data side's copies equal the control side's registers (so w_go_d / r_go_d equal w_go / r_go)
-        if (q_valid_d !== q_valid || ract_d !== ract || wact_d !== wact || acc_full_d !== acc_full) begin
-            $display("TANGO CONTRACT: DDR3 cport data-side copies differ at %0t (%m): q_valid %b/%b ract %b/%b wact %b/%b acc_full %b/%b",
-                     $time, q_valid, q_valid_d, ract, ract_d, wact, wact_d, acc_full, acc_full_d);
+        if (q_valid_d !== q_valid || ract_d !== ract || wact_d !== wact || acc_full_d !== acc_full
+            || q_valid_a !== q_valid || ract_a !== ract || wact_a !== wact || acc_full_a !== acc_full) begin
+            $display("TANGO CONTRACT: DDR3 cport data-side copies differ at %0t (%m): q_valid %b/%b/%b ract %b/%b/%b wact %b/%b/%b acc_full %b/%b/%b",
+                     $time, q_valid, q_valid_d, q_valid_a, ract, ract_d, ract_a, wact, wact_d, wact_a, acc_full, acc_full_d, acc_full_a);
             $fatal(1, "TANGO CONTRACT: DDR3 cport data-side copies violated (see the line above)");
         end
         // the lanes' copies equal the originals
