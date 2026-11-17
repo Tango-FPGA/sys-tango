@@ -43,6 +43,9 @@
 # by this flag.
 # TANGO_VIDEO_NO_ROTATE=1 (with TANGO_VIDEO_ROTATE=1): the core drives VIDEO_NO_ROTATE, which forces rotation off and
 # hides the Rotation entry for a landscape game (sys/tango_cfg.vh, README "Rotation").
+# TANGO_VIDEO_ROTATE_CCW=1 (with TANGO_VIDEO_ROTATE=1): the core drives VIDEO_ROTATE_CCW, which swaps the Rotation
+# setting's CW and CCW for a game whose cabinet turns the monitor counter-clockwise (sys/tango_cfg.vh, README
+# "Rotation").
 # TANGO_VIDEO_PROC=1 (with TANGO_VIDEO_ASCAL=1): MiSTer's video processing -- polyphase filters, gamma, shadow mask
 # -- and its audio filter (README "Video and audio processing"); TANGO_AUDIO_FILTER=1: the audio filter alone (any core).
 # TANGO_VIDEO_DDR3=1 (with TANGO_VIDEO_ASCAL=1; not with TANGO_ASCAL_EXT, TANGO_DBG): ascal's frames
@@ -178,6 +181,10 @@ fi
 if [ "${TANGO_VIDEO_NO_ROTATE:-0}" = 1 ]; then   # the core's VIDEO_NO_ROTATE output (sys/tango_cfg.vh)
     [ "${TANGO_VIDEO_ROTATE:-0}" = 1 ] || { echo "build_core.sh: TANGO_VIDEO_NO_ROTATE=1 needs TANGO_VIDEO_ROTATE=1 (sys/tango_cfg.vh)"; exit 2; }
     printf '`define TANGO_VIDEO_NO_ROTATE\n' >> "$DEFS"
+fi
+if [ "${TANGO_VIDEO_ROTATE_CCW:-0}" = 1 ]; then   # the core's VIDEO_ROTATE_CCW output (sys/tango_cfg.vh)
+    [ "${TANGO_VIDEO_ROTATE:-0}" = 1 ] || { echo "build_core.sh: TANGO_VIDEO_ROTATE_CCW=1 needs TANGO_VIDEO_ROTATE=1 (sys/tango_cfg.vh)"; exit 2; }
+    printf '`define TANGO_VIDEO_ROTATE_CCW\n' >> "$DEFS"
 fi
 VPROC=0; AFILT=0
 if [ "${TANGO_VIDEO_PROC:-0}" = 1 ]; then   # MiSTer's video + audio processing (README "Video and audio processing")

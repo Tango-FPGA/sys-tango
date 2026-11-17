@@ -438,7 +438,33 @@ module tango_sys #(
     // here).
     // rotate_mode: status[`TANGO_VO_B_ROTATE] via tango_cdc_word, clk_pix -> clk_video -- not a Verilog
     // constant, which would let synthesis constant-fold the block away.
+`ifdef TANGO_VIDEO_ROTATE_CCW
+    // TANGO_VIDEO_ROTATE_CCW (tango_cfg.vh): the core's VIDEO_ROTATE_CCW (clk_sys) swaps CW and CCW (rotate_mode bits
+    // swapped: 01 <-> 10, 00 and 11 unchanged) after the status CDC and after VIDEO_NO_ROTATE's force to Normal;
+    // status[119:118] itself is untouched.
+    wire [1:0]  rotate_mode_set;        // the Rotation setting in clk_video (after VIDEO_NO_ROTATE)
+    wire        video_rotate_ccw;       // the core's VIDEO_ROTATE_CCW (clk_sys)
+    wire        rotate_ccw_v;           // VIDEO_ROTATE_CCW in clk_video
 `ifdef TANGO_VIDEO_NO_ROTATE
+    wire [1:0]  rotate_mode_st;         // status[119:118] in clk_video
+    wire        no_rotate_v;            // VIDEO_NO_ROTATE in clk_video
+    tango_cdc_word #(.W(2)) u_vrot_cdc (
+        .clk_a(clk_pix), .din(status_l[`TANGO_VO_B_ROTATE]),
+        .clk_b(clk_video), .dout(rotate_mode_st));
+    tango_cdc_word #(.W(1)) u_norot_cdc (
+        .clk_a(clk_sys), .din(video_no_rotate),
+        .clk_b(clk_video), .dout(no_rotate_v));
+    assign rotate_mode_set = no_rotate_v ? 2'b00 : rotate_mode_st;
+`else
+    tango_cdc_word #(.W(2)) u_vrot_cdc (
+        .clk_a(clk_pix), .din(status_l[`TANGO_VO_B_ROTATE]),
+        .clk_b(clk_video), .dout(rotate_mode_set));
+`endif
+    tango_cdc_word #(.W(1)) u_rccw_cdc (
+        .clk_a(clk_sys), .din(video_rotate_ccw),
+        .clk_b(clk_video), .dout(rotate_ccw_v));
+    wire [1:0]  rotate_mode_vrot = rotate_ccw_v ? {rotate_mode_set[0], rotate_mode_set[1]} : rotate_mode_set;
+`elsif TANGO_VIDEO_NO_ROTATE
     // TANGO_VIDEO_NO_ROTATE (tango_cfg.vh): the core's VIDEO_NO_ROTATE (clk_sys) forces Normal after the status CDC;
     // status[119:118] itself is untouched, so the saved setting comes back when the core drops the bit.
     wire [1:0]  rotate_mode_st;         // status[119:118] in clk_video
@@ -832,6 +858,9 @@ module tango_sys #(
         .status(status_c), .status_menumask(menumask_core), .VIDEO_NO_ROTATE(video_no_rotate),
 `else
         .status(status_c), .status_menumask(menumask_c),
+`endif
+`ifdef TANGO_VIDEO_ROTATE_CCW
+        .VIDEO_ROTATE_CCW(video_rotate_ccw),
 `endif
         .ioctl_download(ioctl_download), .ioctl_index(ioctl_index), .ioctl_wr(ioctl_wr),
         .ioctl_addr(ioctl_addr), .ioctl_dout(ioctl_dout), .ioctl_wait(ioctl_wait),

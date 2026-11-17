@@ -1,6 +1,6 @@
 # sys-tango -- the Tango framework
 
-**Version 2026-11-15** (date code `20261115-3`)
+**Version 2026-11-17** (date code `20261117`)
 
 sys-tango is the framework every Tango core is built on: a MiSTer-style `sys/` for the
 **Sipeed Tang Console 138K**. A core mounts this repository as a git submodule at `sys/` and keeps its own code beside
@@ -154,6 +154,7 @@ A `CONF_STR` may be up to 4095 bytes (12-bit `conf_addr`).
 | `status` [127:0] | in | CLK_SYS | the option word: the `CONF_STR` `O`/`T`/`R` bits; `status[0]` is the soft reset; with `TANGO_VIDEO_OPTS`, `status[127:118]` belongs to the framework |
 | `status_menumask` [15:0] | out | CLK_SYS | the bits the `CONF_STR` `H`/`D` prefixes test |
 | `VIDEO_NO_ROTATE` | out | CLK_SYS | with `TANGO_VIDEO_NO_ROTATE`: high for a landscape game on a rotating core (see [Rotation](#rotation)) |
+| `VIDEO_ROTATE_CCW` | out | CLK_SYS | with `TANGO_VIDEO_ROTATE_CCW`: high for a game whose cabinet turns the monitor counter-clockwise (see [Rotation](#rotation)) |
 | `ioctl_download`, `ioctl_index`, `ioctl_wr`, `ioctl_addr`, `ioctl_dout` | in | CLK_SYS | a file from an `F` entry, one byte per `ioctl_wr` |
 | `ioctl_wait` | out | CLK_SYS | high holds the next byte back; nothing is lost |
 | `ioctl_upload`, `ioctl_rd` / `ioctl_din` | in / out | CLK_SYS | with `TANGO_IOCTL_UPLOAD`: the firmware reads a file back from the core (e.g. NVRAM), MiSTer's upload direction: the framework raises `ioctl_upload`, sets `ioctl_addr` / `ioctl_index` and pulses `ioctl_rd`; the core answers on `ioctl_din` (up to 2048 bytes; `ioctl_upload_req` / `_index` are present but not acted on) |
@@ -196,6 +197,7 @@ build is exactly as it was before the option existed.
 | `TANGO_VIDEO_OPTS=1` | (with ascal) the framework's Video page: Aspect ratio, Scale, Scanlines in `status[127:122]`; the framework reserves `status[127:118]` |
 | `TANGO_VIDEO_ROTATE=1` | (with `TANGO_VIDEO_DDR3`; sets `TANGO_DDRAM`) screen rotation for arcade cores: see [Rotation](#rotation) |
 | `TANGO_VIDEO_NO_ROTATE=1` | (with `TANGO_VIDEO_ROTATE`) the core drives `VIDEO_NO_ROTATE` to mark a landscape game: see [Rotation](#rotation) |
+| `TANGO_VIDEO_ROTATE_CCW=1` | (with `TANGO_VIDEO_ROTATE`) the core drives `VIDEO_ROTATE_CCW` to mark a counter-clockwise game: see [Rotation](#rotation) |
 | `TANGO_VIDEO_PROC=1` | (with ascal) MiSTer's video processing: polyphase filters, gamma, shadow mask; implies `TANGO_AUDIO_FILTER` |
 | `TANGO_AUDIO_FILTER=1` | MiSTer's audio filter, boost, stereo mix and global volume (any core) |
 | `TANGO_VSYNC_ADJUST=1` [`TANGO_VSYNC_DEFAULT=0\|1`] | (with ascal and `TANGO_VIDEO_PROC` or `TANGO_AUDIO_FILTER`) native-rate video: see [Native-rate video](#native-rate-video-vsync_adjust) |
@@ -300,6 +302,16 @@ and the framework puts `VIDEO_NO_ROTATE` on bit 15 of the menumask the firmware 
 this build the core's own `status_menumask[15]` is not used; its bits 0-14 pass through. Without the option the core
 has no new port and its `CONF_STR` is unchanged.
 
+**A counter-clockwise game on a rotating core** (`TANGO_VIDEO_ROTATE_CCW=1`, with `TANGO_VIDEO_ROTATE`). Rotation's
+CW and CCW are one setting for the whole core, but some arcade boards ran in cabinets that turned the monitor the other
+way (MiSTer's per-game `rotate_ccw`, e.g. Arcade-Galaxian.sv 437-438). The core then drives `VIDEO_ROTATE_CCW`
+(CLK_SYS, quasi-static, from a register) high for such a game: while it is high the framework swaps CW and CCW for the
+picture, so the setting CW turns this game counter-clockwise and CCW turns it clockwise. Normal stays Normal, and
+`status[119:118]` and the menu are not touched; with `TANGO_VIDEO_NO_ROTATE` too, `VIDEO_NO_ROTATE` wins (Normal).
+Such a core may read `status[119:118]` to know whether the framework turns the picture (CW or CCW) or not (Normal),
+for example to turn the picture itself for a physically turned monitor; it reads no other framework bit. Without the
+option the core has no new port.
+
 ## The DDR3 path
 
 `TANGO_VIDEO_DDR3` moves ascal's frame buffers from the SDRAM into the board's DDR3:
@@ -388,7 +400,7 @@ a pad's buttons count only after its reports have once read as all released.
 
 - **DualShock 4** pads use a built-in decode (`tango_ds4_joy.v`).
 - **Other pads**, full or low speed -- HID pads, and Xbox 360-class pads (vendor class FF/5D/01, which get their
-  start-up reads) -- go through the table-driven decoder `tango_pad_decode.v`. The host stores the device, configuration and HID report
+  start-up reads, also when the configuration probe fails) -- go through the table-driven decoder `tango_pad_decode.v`. The host stores the device, configuration and HID report
   descriptors; the firmware reads them, looks the pad up in its controller database and programs a decode table of up
   to 64 entries (field, test, output bit) for the port; the decoder evaluates it on every report, in the USB clock.
 - **Keyboards** in the HID boot protocol become MiSTer's `ps2_key` events.

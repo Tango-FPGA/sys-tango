@@ -126,6 +126,19 @@ tango_video_no_rotate_needs_TANGO_VIDEO_ROTATE
 `endif
 `endif
 
+// TANGO_VIDEO_ROTATE_CCW (with TANGO_VIDEO_ROTATE): the core gets one more output, VIDEO_ROTATE_CCW (CLK_SYS,
+// quasi-static; tango_core_ports.vh), for a game whose cabinet turns the monitor counter-clockwise on a core whose
+// other games turn it clockwise (MiSTer's per-game rotate_ccw into screen_rotate, e.g. Arcade-Galaxian.sv 437-438).
+// While it is high the rotation client gets CW and CCW swapped: rotate_mode 01 <-> 10 after the status CDC (and after
+// TANGO_VIDEO_NO_ROTATE's force to Normal); 00 (Normal) and 11 pass unchanged.  status[119:118] itself and the Rotation
+// entry are not touched.  build_core.sh TANGO_VIDEO_ROTATE_CCW=1; sims +define+TANGO_VIDEO_ROTATE_CCW.
+// Not defined: no port; the build is as before.
+`ifdef TANGO_VIDEO_ROTATE_CCW
+`ifndef TANGO_VIDEO_ROTATE
+tango_video_rotate_ccw_needs_TANGO_VIDEO_ROTATE
+`endif
+`endif
+
 // TANGO_NES_SDRAM: expose tango_sdram's NES-compatible port A (PPU/CHR) and port B (CPU/ROM) to the
 // core via tango_core_ports.vh.  Use with TANGO_VIDEO_ASCAL; mutually exclusive with TANGO_SDRAM.
 // Port interface is identical to sdram_nes.v (addrA/B, oeA/B, weA/B, dinA/B, doutA/B, clkref, busy).

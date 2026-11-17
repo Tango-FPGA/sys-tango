@@ -265,7 +265,7 @@ module usb_fs_host (
     // OUT, in the order of FPGA Companion's usbh_xbox_client_thread (bl616/companion/src/bl616/mcu_hw.c 635-698, whose xpad quirk packets
     // QUIRK_360_START_PKT_1..3 these are): string 2 (2 and 32 bytes), class IN interface 0100/0x20, class IN interface 0000/8, class IN
     // device 0000/4, vendor IN interface 0100/20.  A read that fails is given up (a STALL at once, no answer after its stage budget) and the next one runs.
-    reg        is_xin;               // the first interface is class FF subclass 5D protocol 01
+    reg        is_xin;               // the first interface is class FF subclass 5D protocol 01 (the pc11-13 probe; w_xin below: the same test on pc16-18)
     reg [2:0]  qi;
     reg [5:0]  ep_miss;
     reg [15:0] rx_toctr;
@@ -306,14 +306,17 @@ module usb_fs_host (
     reg        walk_rst;                                  // request from the FSM: start a fresh walk
     reg [7:0]  w_rem, w_i, w_type, cur_if, cur_alt, cur_cls, cur_sub, ep_a;
     reg        h_sel, h_found, ep_found;
+    reg        w_xin, w_if1;                              // w_xin: the full read's first interface is FF/5D/01 (the pc12 probe's test); w_if1: that interface seen
     reg [7:0]  h_if;  reg [15:0] h_rlen, cfg_total;  reg [3:0] h_ep;
     always @(posedge clk48 or negedge rst_n) begin
         if (!rst_n) begin
             w_rem <= 8'd0; w_i <= 8'd0; w_type <= 8'd0; cur_if <= 8'd0; cur_alt <= 8'd0; cur_cls <= 8'd0; cur_sub <= 8'd0; ep_a <= 8'd0;
             h_sel <= 1'b0; h_found <= 1'b0; ep_found <= 1'b0; h_if <= 8'd0; h_rlen <= 16'd0; cfg_total <= 16'd0; h_ep <= 4'd0;
+            w_xin <= 1'b0; w_if1 <= 1'b0;
         end else if (walk_rst) begin
             w_rem <= 8'd0; w_i <= 8'd0; w_type <= 8'd0; cur_if <= 8'd0; cur_alt <= 8'd0; cur_cls <= 8'd0; cur_sub <= 8'd0; ep_a <= 8'd0;
             h_sel <= 1'b0; h_found <= 1'b0; ep_found <= 1'b0; h_if <= 8'd0; h_rlen <= 16'd0; cfg_total <= 16'd0; h_ep <= 4'd0;
+            w_xin <= 1'b0; w_if1 <= 1'b0;
         end else if (wk_v) begin
             if (w_rem == 8'd0) begin                      // the first byte of a descriptor: bLength (0 is malformed: one byte consumed, go on)
                 w_rem <= (wk_b == 8'd0) ? 8'd0 : wk_b - 8'd1; w_i <= 8'd1;
@@ -331,6 +334,10 @@ module usb_fs_host (
                                    if (cur_cls == 8'd3 && cur_alt == 8'd0 && !h_found && !(cur_sub == 8'd1 && wk_b != 8'd0)) begin
                                        h_found <= 1'b1; h_if <= cur_if; h_sel <= 1'b1;
                                    end
+                                   // the same test as the pc12 probe's (the first interface only), from the full read: a failed probe
+                                   // must not leave an Xbox 360 class pad without its start-up reads
+                                   if (!w_if1 && cur_cls == 8'hFF && cur_sub == 8'h5D && wk_b == 8'h01) w_xin <= 1'b1;
+                                   w_if1 <= 1'b1;
                                end
                            end
                     8'h21: begin if (h_sel && w_i == 8'd7) h_rlen[7:0] <= wk_b; else if (h_sel && w_i == 8'd8) h_rlen[15:8] <= wk_b; end
@@ -530,7 +537,7 @@ module usb_fs_host (
                     if (script_pc >= 5'd22) begin                       // an Xbox start-up read that failed: the next one
                         if (qi == 3'd5) script_pc <= 5'd4; else begin qi <= qi + 3'd1; script_pc <= 5'd22; end
                     end
-                    else if (is_xin && script_pc >= 5'd16) begin script_pc <= 5'd22; qi <= 3'd0; end   // the configuration phase failed: the start-up reads still run
+                    else if ((is_xin | w_xin) && script_pc >= 5'd16) begin script_pc <= 5'd22; qi <= 3'd0; end   // the configuration phase failed: the start-up reads still run
                     else if (script_pc >= 4'd14) script_pc <= 4'd4;
                     else if (script_pc < 5'd11 && reenum != REENUM_MAX) begin
                         // the device descriptor read failed: no device is run without its identity while re-enumerations
@@ -618,10 +625,10 @@ module usb_fs_host (
                                      rq_widx <= h_if; rq_wlen <= {5'd0, want_rlen};
                                      if (h_rlen > 16'd1024) desc_trunc[1] <= 1'b1;
                                      script_pc <= 5'd19;
-                                 end else begin script_pc <= is_xin ? 5'd22 : 5'd4; qi <= 3'd0; end
+                                 end else begin script_pc <= (is_xin | w_xin) ? 5'd22 : 5'd4; qi <= 3'd0; end
                              end
                     5'd19:   begin script_pc <= 5'd20; doff <= 11'd0; exp_pid <= PID_DATA1; end
-                    5'd21:   begin script_pc <= is_xin ? 5'd22 : 5'd4; qi <= 3'd0; end
+                    5'd21:   begin script_pc <= (is_xin | w_xin) ? 5'd22 : 5'd4; qi <= 3'd0; end
                     5'd22:   begin script_pc <= 5'd23; doff <= 11'd0; exp_pid <= PID_DATA1; end
                     5'd24:   begin if (qi == 3'd5) script_pc <= 5'd4; else begin qi <= qi + 3'd1; script_pc <= 5'd22; end end
                     default: script_pc <= script_pc + 5'd1;                  // pc0 -> 1, 2 -> 3, 14 -> 15

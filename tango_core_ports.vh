@@ -23,6 +23,15 @@ output wire [15:0]  status_menumask,// H/D prefixes of the CONF_STR test these b
 // status_menumask[15] is not used.  Quasi-static (set when a game is chosen); any change is carried across clocks.
 output wire         VIDEO_NO_ROTATE,
 `endif
+`ifdef TANGO_VIDEO_ROTATE_CCW
+// TANGO_VIDEO_ROTATE_CCW (tango_cfg.vh; with TANGO_VIDEO_ROTATE): high = the current game's cabinet turns the monitor
+// counter-clockwise (MiSTer's per-game rotate_ccw, Arcade-Galaxian.sv 437-438).  While high the framework swaps the
+// Rotation setting's CW and CCW for this game; Normal is unchanged and status[119:118] keeps its value.  Drive it from
+// a register (it crosses into the video clock).  Quasi-static (set when a game is chosen); any change is carried across
+// clocks.  Such a core may read status[119:118] only to know whether the framework turns the picture (CW or CCW) or
+// not (Normal), e.g. to turn the picture itself for a physically turned monitor.
+output wire         VIDEO_ROTATE_CCW,
+`endif
 input  wire         ioctl_download, // a file is being sent (F entry)
 input  wire [15:0]  ioctl_index,    // which: F digit or menu position + extension index * 64
 input  wire         ioctl_wr,       // one pulse per byte
@@ -79,10 +88,12 @@ output wire [23:0]  VIDEO_PAL_D,
 //      arcade parity, sys/tango_video_opts.vh) and Scanlines (status[123:122]), entries from `TANGO_VIDEO_CONF /
 //      `TANGO_VIDEO_CONF_P("P1") in the CONF_STR; status[121:120] stays reserved (a future Filter entry) and
 //      status[119:118] is Rotation in TANGO_VIDEO_ROTATE builds (TANGO_VO_B_ROTATE; a landscape
-//      game forces it off with VIDEO_NO_ROTATE, TANGO_VIDEO_NO_ROTATE above). The core then outputs its NATIVE shape
+//      game forces it off with VIDEO_NO_ROTATE, TANGO_VIDEO_NO_ROTATE above; a counter-clockwise game swaps CW and CCW
+//      with VIDEO_ROTATE_CCW, TANGO_VIDEO_ROTATE_CCW above). The core then outputs its NATIVE shape
 //      on VIDEO_ARX/ARY (what the menu calls "Original", e.g. NES 64:49), ties VIDEO_SCALE and VGA_SL to 0 (sys does not use them; the
-//      sims stop with "TANGO CONTRACT: VIDEO_OPTS ..." otherwise) and reads none of status[127:118].  Without the
-//      option the core drives all four itself, as before.
+//      sims stop with "TANGO CONTRACT: VIDEO_OPTS ..." otherwise) and reads none of status[127:118] (one exception:
+//      a TANGO_VIDEO_ROTATE_CCW core may read status[119:118] to know whether the framework turns the picture).
+//      Without the option the core drives all four itself, as before.
 output wire         CLK_VIDEO,
 output wire         CE_PIXEL,       // keeps pulsing in the blanking (RULE above)
 output wire [7:0]   VGA_R,
