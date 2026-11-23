@@ -57,11 +57,14 @@ module usb_fs_phy (
     reg line_drive, line_k;
     wire se0_phase  = line_drive && ((tx_st == TXS_EOP1) || (tx_st == TXS_EOP2));
     wire eopj_phase = line_drive && (tx_st == TXS_EOPJ);
-    // LOW SPEED: line_drive is released by TXS_IDLE on the next bit-cell enable, up to 8 clocks after the EOP's J bit; line_k still holds the last data bit
-    // and, with ls = 1, would drive that stale K onto the bus for up to a quarter of a bit time right after every EOP (a wire monitor in
-    // simulation read it as a start of packet 1 bit after the EOP, and as both lines high against the device's own J).  With ls = 1 the data
-    // level is therefore driven only while sending; with ls = 0 line_k is used as it always was (the full-speed path is unchanged: its glitch is one clock).
-    wire k_now = line_k && (!ls || tx_st == TXS_SEND || tx_st == TXS_LASTBIT);
+    // line_drive is released by TXS_IDLE one clock (full speed) or up to 8 clocks (low speed, the next bit-cell enable) after the EOP's J
+    // bit, and line_k still holds the last data bit: when that bit was a K, the bus showed a stale K right after the EOP, and a device
+    // reads it as the start of a new packet one bit after the EOP (a wire monitor in simulation saw it as a start of packet, and as
+    // both lines high against the device's own J).  At full speed the K lasted one 48 MHz clock, after every packet whose last bit was a K
+    // (every SET_ADDRESS DATA0, about half the SOFs); on the wire the released line then returns to J only through the pull resistors and
+    // the cable capacitance, inside the window where a fast device starts its handshake.  The data level is therefore driven only while
+    // sending, at both speeds.
+    wire k_now = line_k && (tx_st == TXS_SEND || tx_st == TXS_LASTBIT);
     wire dp_drive_val = se0_phase ? 1'b0 : (eopj_phase ? 1'b1 : (k_now ? 1'b0 : 1'b1));
     wire dn_drive_val = se0_phase ? 1'b0 : (eopj_phase ? 1'b0 : (k_now ? 1'b1 : 1'b0));
     // low speed: the J/K roles of D+ and D- swap
