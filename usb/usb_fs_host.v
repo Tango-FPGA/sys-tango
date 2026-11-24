@@ -260,14 +260,12 @@ module usb_fs_host (
     reg [7:0]  exp_pid;              // the data PID the next control-read packet must carry (DATA1 first, then toggling)
     reg [15:0] rq_wlen;              // wLength of the report-descriptor request; wIndex = the HID interface
     reg [7:0]  rq_widx;
-    reg        ep_from_cfg;          // the polled endpoint came from the configuration descriptor, not the scan
     // Xbox 360 class (interface FF/5D/01) start-up reads, pc22-24: six control reads, each SETUP / data IN (discarded) / status
     // OUT, in the order of FPGA Companion's usbh_xbox_client_thread (bl616/companion/src/bl616/mcu_hw.c 635-698, whose xpad quirk packets
     // QUIRK_360_START_PKT_1..3 these are): string 2 (2 and 32 bytes), class IN interface 0100/0x20, class IN interface 0000/8, class IN
     // device 0000/4, vendor IN interface 0100/20.  A read that fails is given up (a STALL at once, no answer after its stage budget) and the next one runs.
     reg        is_xin;               // the first interface is class FF subclass 5D protocol 01 (the pc11-13 probe; w_xin below: the same test on pc16-18)
     reg [2:0]  qi;
-    reg [5:0]  ep_miss;
     reg [15:0] rx_toctr;
     reg [16:0] rx_hardcap;
     reg [10:0] fail_streak;
@@ -306,17 +304,19 @@ module usb_fs_host (
     reg        walk_rst;                                  // request from the FSM: start a fresh walk
     reg [7:0]  w_rem, w_i, w_type, cur_if, cur_alt, cur_cls, cur_sub, ep_a;
     reg        h_sel, h_found, ep_found;
+    reg        x_sel, x_found;                           // x_sel: in the first interface, and it is FF/5D/01; x_found: its first interrupt IN (x_ep) seen
+    reg [3:0]  x_ep;
     reg        w_xin, w_if1;                              // w_xin: the full read's first interface is FF/5D/01 (the pc12 probe's test); w_if1: that interface seen
     reg [7:0]  h_if;  reg [15:0] h_rlen, cfg_total;  reg [3:0] h_ep;
     always @(posedge clk48 or negedge rst_n) begin
         if (!rst_n) begin
             w_rem <= 8'd0; w_i <= 8'd0; w_type <= 8'd0; cur_if <= 8'd0; cur_alt <= 8'd0; cur_cls <= 8'd0; cur_sub <= 8'd0; ep_a <= 8'd0;
             h_sel <= 1'b0; h_found <= 1'b0; ep_found <= 1'b0; h_if <= 8'd0; h_rlen <= 16'd0; cfg_total <= 16'd0; h_ep <= 4'd0;
-            w_xin <= 1'b0; w_if1 <= 1'b0;
+            w_xin <= 1'b0; w_if1 <= 1'b0; x_sel <= 1'b0; x_found <= 1'b0; x_ep <= 4'd0;
         end else if (walk_rst) begin
             w_rem <= 8'd0; w_i <= 8'd0; w_type <= 8'd0; cur_if <= 8'd0; cur_alt <= 8'd0; cur_cls <= 8'd0; cur_sub <= 8'd0; ep_a <= 8'd0;
             h_sel <= 1'b0; h_found <= 1'b0; ep_found <= 1'b0; h_if <= 8'd0; h_rlen <= 16'd0; cfg_total <= 16'd0; h_ep <= 4'd0;
-            w_xin <= 1'b0; w_if1 <= 1'b0;
+            w_xin <= 1'b0; w_if1 <= 1'b0; x_sel <= 1'b0; x_found <= 1'b0; x_ep <= 4'd0;
         end else if (wk_v) begin
             if (w_rem == 8'd0) begin                      // the first byte of a descriptor: bLength (0 is malformed: one byte consumed, go on)
                 w_rem <= (wk_b == 8'd0) ? 8'd0 : wk_b - 8'd1; w_i <= 8'd1;
@@ -328,7 +328,7 @@ module usb_fs_host (
                     8'd4:  begin                          // interface: number, alternate setting, class (the first HID interface at alternate 0 wins)
                                if (w_i == 8'd2) cur_if <= wk_b;
                                else if (w_i == 8'd3) cur_alt <= wk_b;
-                               else if (w_i == 8'd5) begin cur_cls <= wk_b; h_sel <= 1'b0; end
+                               else if (w_i == 8'd5) begin cur_cls <= wk_b; h_sel <= 1'b0; x_sel <= 1'b0; end
                                else if (w_i == 8'd6) cur_sub <= wk_b;
                                else if (w_i == 8'd7) begin     // protocol: the first HID interface at alternate 0 that is not a boot keyboard / mouse
                                    if (cur_cls == 8'd3 && cur_alt == 8'd0 && !h_found && !(cur_sub == 8'd1 && wk_b != 8'd0)) begin
@@ -336,14 +336,22 @@ module usb_fs_host (
                                    end
                                    // the same test as the pc12 probe's (the first interface only), from the full read: a failed probe
                                    // must not leave an Xbox 360 class pad without its start-up reads
-                                   if (!w_if1 && cur_cls == 8'hFF && cur_sub == 8'h5D && wk_b == 8'h01) w_xin <= 1'b1;
+                                   if (!w_if1 && cur_cls == 8'hFF && cur_sub == 8'h5D && wk_b == 8'h01) begin w_xin <= 1'b1; x_sel <= 1'b1; end
                                    w_if1 <= 1'b1;
                                end
                            end
                     8'h21: begin if (h_sel && w_i == 8'd7) h_rlen[7:0] <= wk_b; else if (h_sel && w_i == 8'd8) h_rlen[15:8] <= wk_b; end
-                    8'd5:  if (h_sel && !ep_found) begin  // endpoint of the chosen interface: the first interrupt IN
-                               if (w_i == 8'd2) ep_a <= wk_b;
-                               else if (w_i == 8'd3 && ep_a[7] && wk_b[1:0] == 2'd3 && ep_a[3:0] != 4'd0) begin ep_found <= 1'b1; h_ep <= ep_a[3:0]; end
+                    8'd5:  begin
+                               if (h_sel && !ep_found) begin  // endpoint of the chosen interface: the first interrupt IN
+                                   if (w_i == 8'd2) ep_a <= wk_b;
+                                   else if (w_i == 8'd3 && ep_a[7] && wk_b[1:0] == 2'd3 && ep_a[3:0] != 4'd0) begin ep_found <= 1'b1; h_ep <= ep_a[3:0]; end
+                               end
+                               // the Xbox 360 class interface's report endpoint (its first interrupt IN): the other interfaces' IN endpoints
+                               // exist and NAK for ever, so the scan must not be left to find it
+                               if (x_sel && !x_found) begin
+                                   if (w_i == 8'd2) ep_a <= wk_b;
+                                   else if (w_i == 8'd3 && ep_a[7] && wk_b[1:0] == 2'd3 && ep_a[3:0] != 4'd0) begin x_found <= 1'b1; x_ep <= ep_a[3:0]; end
+                               end
                            end
                     default: ;
                 endcase
@@ -410,9 +418,19 @@ module usb_fs_host (
     // answers the data stage but fails the status stage still uses the re-enumerations up), by the fallback and by a detach
     localparam [1:0] REENUM_MAX = 2'd3;
     reg [1:0]  reenum;
+    // a device whose full configuration read failed (any class): the read is tried again after CFG_PAUSE frames, CFG_TRIES times.  Without
+    // the stored configuration the BL616 has no descriptor to decode the pad by (a HID pad's report descriptor needs the interface number,
+    // an Xbox 360 class pad is known only by its interface), the poll has no configured endpoint, and without the walker's w_xin a failed
+    // probe also leaves an Xbox 360 class pad without its start-up reads.
+    localparam [1:0] CFG_TRIES = 2'd3;
+    localparam [6:0] CFG_PAUSE = 7'd100;
+    reg [1:0]  cfg_try;
+    reg [6:0]  cfg_wait;
 
-    // interrupt-IN endpoint scan: a poll that TIMES OUT means "no such
-    // endpoint" -> try the next; NAK or DATA identifies the live endpoint.
+    // interrupt-IN endpoint scan, for a device whose configuration names no
+    // report endpoint: a poll that TIMES OUT means "no such endpoint" and a
+    // STALL "not this one" -> try the next; NAK or DATA identifies the live
+    // endpoint.
     reg [3:0] poll_ep;
     reg       ep_locked;
     assign dbg_ep = {ep_locked, poll_ep};
@@ -463,7 +481,8 @@ module usb_fs_host (
             cap_kind<=3'd0; cap_off<=7'd0;
             rpt16<=128'd0; rpt_len<=8'd0; rpt2_tog<=1'b0; rpt2_valid<=1'b0; dev_ver<=16'd0; desc_rdy<=1'b0;
             len_cfg<=9'd0; len_rpt<=11'd0; len_dev<=8'd0; desc_trunc<=2'b00; doff<=11'd0; exp_pid<=PID_DATA1; rq_wlen<=16'd0; rq_widx<=8'd0;
-            ep_from_cfg<=1'b0; ep_miss<=6'd0; walk_rst<=1'b0; t_clr<=1'b0; is_xin<=1'b0; qi<=3'd0;
+            walk_rst<=1'b0; t_clr<=1'b0; is_xin<=1'b0; qi<=3'd0;
+            cfg_try<=2'd0; cfg_wait<=7'd0;
         end else begin
             ka_go <= 0;
             pkt_go <= 0; st_clear_rx <= 0; walk_rst <= 1'b0; t_clr <= 1'b0;
@@ -479,7 +498,8 @@ module usb_fs_host (
                 if (!dev_present) reenum <= 2'd0;                 // detached: the next device starts with every re-enumeration
                 cap_kind <= 3'd0; cap_off <= 7'd0;
                 desc_rdy <= 1'b0; len_cfg <= 9'd0; len_rpt <= 11'd0; len_dev <= 8'd0; desc_trunc <= 2'b00; dev_ver <= 16'd0;
-                ep_from_cfg <= 1'b0; ep_miss <= 6'd0; t_clr <= 1'b1; walk_rst <= 1'b1; is_xin <= 1'b0; qi <= 3'd0;
+                t_clr <= 1'b1; walk_rst <= 1'b1; is_xin <= 1'b0; qi <= 3'd0;
+                cfg_try <= 2'd0; cfg_wait <= 7'd0;
                 if (dev_present) begin st <= S_ATTACH_DLY; ms_ctr <= 0; ls <= dev_ls; end
             end
             S_ATTACH_DLY: begin
@@ -529,6 +549,9 @@ module usb_fs_host (
                 if (adr_wait != 2'd0) begin
                     adr_wait <= adr_wait - 2'd1;
                     st <= S_SOF_IDLE;
+                end else if (cfg_wait != 7'd0) begin               // the pause before a configuration read is tried again
+                    cfg_wait <= cfg_wait - 7'd1;
+                    st <= S_SOF_IDLE;
                 end else
                 // descriptor / protocol stage out of tries (or STALLed): give up, go on
                 if (script_pc >= 4'd8 && tries_now >= tries_max) begin
@@ -536,6 +559,9 @@ module usb_fs_host (
                     st <= S_SOF_IDLE;
                     if (script_pc >= 5'd22) begin                       // an Xbox start-up read that failed: the next one
                         if (qi == 3'd5) script_pc <= 5'd4; else begin qi <= qi + 3'd1; script_pc <= 5'd22; end
+                    end
+                    else if (script_pc >= 5'd16 && script_pc <= 5'd18 && cfg_try != CFG_TRIES) begin
+                        cfg_try <= cfg_try + 2'd1; cfg_rs <= 3'd0; cfg_wait <= CFG_PAUSE; script_pc <= 5'd16;   // the full configuration read again
                     end
                     else if ((is_xin | w_xin) && script_pc >= 5'd16) begin script_pc <= 5'd22; qi <= 3'd0; end   // the configuration phase failed: the start-up reads still run
                     else if (script_pc >= 4'd14) script_pc <= 4'd4;
@@ -545,7 +571,7 @@ module usb_fs_host (
                         // reset, SET_ADDRESS again), with the reconnect watchdog's clean-up
                         reenum <= reenum + 2'd1;
                         st <= S_WAIT_DEV; script_pc <= 5'd0;
-                        poll_ep <= 4'd1; ep_locked <= 1'b0; ep_from_cfg <= 1'b0;
+                        poll_ep <= 4'd1; ep_locked <= 1'b0;
                         desc_valid <= 1'b0; fail_streak <= 11'd0; rpt2_valid <= 1'b0;
                     end
                     else begin
@@ -620,7 +646,10 @@ module usb_fs_host (
                     // configuration has a HID interface with a report descriptor) or the poll; and the same for the report descriptor
                     5'd16:   begin script_pc <= 5'd17; doff <= 11'd0; exp_pid <= PID_DATA1; walk_rst <= 1'b1; end
                     5'd18:   begin
-                                 if (ep_found && h_found) begin poll_ep <= h_ep; ep_locked <= 1'b1; ep_from_cfg <= 1'b1; ep_miss <= 6'd0; end
+                                 // the report endpoint named by the configuration is polled for good, never scanned away from (only the
+                                 // reconnect watchdog or a re-enumeration ends it); the scan is left for a device whose configuration names none
+                                 if (ep_found && h_found) begin poll_ep <= h_ep; ep_locked <= 1'b1; end
+                                 else if (x_found && w_xin) begin poll_ep <= x_ep; ep_locked <= 1'b1; end
                                  if (h_found && h_rlen != 16'd0) begin
                                      rq_widx <= h_if; rq_wlen <= {5'd0, want_rlen};
                                      if (h_rlen > 16'd1024) desc_trunc[1] <= 1'b1;
@@ -663,7 +692,6 @@ module usb_fs_host (
             end
             S_GOT_DATA: begin
                 fail_streak <= 0;   // any response at all = device is alive
-                ep_miss <= 6'd0;
                 ack_ok = 1'b1;
                 if (rxb[0]==PID_DATA1 || rxb[0]==PID_DATA0) begin
                     if (script_pc == 5'd4) begin
@@ -763,8 +791,13 @@ module usb_fs_host (
                     end else st <= S_SOF_IDLE;
                 end else begin
                     // NAK/STALL: nothing to ACK, retry next frame; a NAK on
-                    // the scanned endpoint proves it exists -> lock it
-                    if (script_pc == 4'd4) ep_locked <= 1;
+                    // the scanned endpoint proves it exists -> lock it.  A STALL
+                    // there (a halted or non-interrupt endpoint) never carries
+                    // reports: the scan goes on to the next endpoint
+                    if (script_pc == 4'd4) begin
+                        if (rxb[0] != PID_STALL) ep_locked <= 1;
+                        else if (!ep_locked) poll_ep <= (poll_ep == 4'd15) ? 4'd1 : poll_ep + 4'd1;
+                    end
                     // a STALLed data or status IN in the descriptor phase: this stage ends at the next frame (the give-up path)
                     if (rxb[0] == PID_STALL && script_pc >= 5'd8) begin desc_tries <= DESC_TRIES_OUT; tries_pc <= script_pc; end
                     st <= S_SOF_IDLE;
@@ -795,11 +828,6 @@ module usb_fs_host (
                     fail_streak <= fail_streak + 11'd1;
                     if (script_pc == 5'd4 && !ep_locked)
                         poll_ep <= (poll_ep == 4'd15) ? 4'd1 : poll_ep + 4'd1;
-                    // an endpoint taken from the configuration descriptor that never answers: give the scan back its job
-                    if (script_pc == 5'd4 && ep_locked && ep_from_cfg) begin
-                        ep_miss <= ep_miss + 6'd1;
-                        if (ep_miss == 6'd31) begin ep_locked <= 1'b0; ep_from_cfg <= 1'b0; ep_miss <= 6'd0; end
-                    end
                     st <= S_SOF_IDLE;
                 end else rx_toctr <= rx_toctr + 16'd1;
             end
@@ -812,7 +840,7 @@ module usb_fs_host (
             // a returning device gets reset + re-enumerated.
             if (fail_streak >= 11'd1500) begin
                 st <= S_WAIT_DEV; script_pc <= 0;
-                poll_ep <= 4'd1; ep_locked <= 0; ep_from_cfg <= 1'b0;
+                poll_ep <= 4'd1; ep_locked <= 0;
                 desc_valid <= 0; fail_streak <= 0; rpt2_valid <= 1'b0;
             end
         end
